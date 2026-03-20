@@ -3,205 +3,1091 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>Diagnostica Sensori</title>
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#070b10">
+<title>INS Navigator</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@600;900&display=swap" rel="stylesheet">
 <style>
-* { box-sizing: border-box; margin: 0; padding: 0; }
-body { background: #0a0e14; color: #c8dde8; font-family: 'Courier New', monospace; font-size: 13px; padding: 12px; }
-h1 { color: #00e5ff; font-size: 14px; letter-spacing: 3px; margin-bottom: 14px; text-align: center; }
-.card { background: #0f1520; border: 1px solid #1e3a52; border-radius: 6px; padding: 12px; margin-bottom: 10px; }
-.card h2 { font-size: 10px; letter-spacing: 2px; color: #4a6a7a; margin-bottom: 10px; }
-.row { display: flex; justify-content: space-between; padding: 3px 0; border-bottom: 1px solid #111927; }
-.lbl { color: #4a6a7a; }
-.val { color: #00e5ff; font-weight: bold; min-width: 90px; text-align: right; }
-.val.g { color: #39ff14; }
-.val.o { color: #ff6b35; }
-.val.w { color: #ffcc00; }
-.status { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #1e3a52; margin-right: 6px; vertical-align: middle; }
-.status.ok { background: #39ff14; box-shadow: 0 0 6px #39ff14; }
-.status.warn { background: #ffcc00; }
-.note { font-size: 10px; color: #4a6a7a; margin-top: 6px; line-height: 1.6; }
-.note b { color: #ffcc00; }
-button { font-family: 'Courier New', monospace; font-size: 12px; letter-spacing: 2px;
-  padding: 12px 24px; border: 1px solid #00e5ff; background: transparent;
-  color: #00e5ff; border-radius: 4px; cursor: pointer; display: block; margin: 0 auto 14px; width: 100%; }
-#log { background: #060a0f; border: 1px solid #1e3a52; border-radius: 4px;
-  padding: 8px; height: 120px; overflow-y: auto; font-size: 10px; line-height: 1.6; }
-.guide { background: #0f1520; border: 1px solid #1e3a52; border-radius: 6px;
-  padding: 12px; margin-bottom: 10px; font-size: 11px; line-height: 1.8; color: #c8dde8; }
-.guide h2 { font-size: 10px; letter-spacing: 2px; color: #ff6b35; margin-bottom: 8px; }
+:root {
+  --bg:    #070b10;
+  --bg2:   #0c1219;
+  --bg3:   #101820;
+  --line:  #182430;
+  --cyan:  #00e5ff;
+  --green: #39ff14;
+  --orange:#ff6b35;
+  --yellow:#ffd600;
+  --red:   #ff3d3d;
+  --text:  #b8d0dc;
+  --dim:   #3a5a6a;
+  --fn: 'Share Tech Mono', monospace;
+  --fu: 'Orbitron', monospace;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+html, body { width:100%; height:100%; overflow:hidden; background:var(--bg); color:var(--text); font-family:var(--fn); }
+
+/* ═══ PERMISSION SCREEN ═══ */
+#perm {
+  position:fixed; inset:0; z-index:200; background:var(--bg);
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:16px; padding:28px;
+}
+#perm-logo { font-family:var(--fu); font-size:22px; font-weight:900; color:var(--cyan); letter-spacing:6px;
+  text-shadow:0 0 20px rgba(0,229,255,.5); }
+#perm-sub  { font-family:var(--fu); font-size:8px; letter-spacing:4px; color:var(--dim); }
+#perm p    { font-size:11px; color:var(--dim); text-align:center; line-height:1.8; max-width:300px; }
+#perm-log  { width:100%; max-width:340px; background:var(--bg2); border:1px solid var(--line);
+  border-radius:6px; padding:10px; font-size:10px; height:130px; overflow-y:auto; line-height:1.7; }
+#perm-warn { font-size:10px; color:var(--red); text-align:center; min-height:14px; }
+#perm-btn  { font-family:var(--fu); font-size:11px; letter-spacing:3px; padding:14px 36px;
+  border:1px solid var(--cyan); background:transparent; color:var(--cyan); border-radius:5px;
+  cursor:pointer; box-shadow:0 0 16px rgba(0,229,255,.25); transition:.2s; }
+#perm-btn:active { opacity:.7; transform:scale(.97); }
+
+/* ═══ APP ═══ */
+#app { display:none; flex-direction:column; height:100vh; }
+
+/* ── HEADER ── */
+#hdr {
+  background:var(--bg2); border-bottom:1px solid var(--line);
+  padding:6px 12px; display:flex; align-items:center; justify-content:space-between; flex-shrink:0;
+}
+#hdr-logo { font-family:var(--fu); font-size:11px; font-weight:900; color:var(--cyan); letter-spacing:4px; }
+#hdr-dots { display:flex; gap:12px; }
+.dot-g { display:flex; flex-direction:column; align-items:center; gap:2px; }
+.dot-c { width:8px; height:8px; border-radius:50%; background:var(--dim); transition:background .4s; }
+.dot-c.on  { background:var(--green); box-shadow:0 0 6px var(--green); animation:pulse 2s infinite; }
+.dot-c.warn{ background:var(--yellow); }
+.dot-c.err { background:var(--red); }
+.dot-l { font-family:var(--fu); font-size:5.5px; letter-spacing:1px; color:var(--dim); }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+/* ── TABS ── */
+#tabs { display:flex; background:var(--bg2); border-bottom:1px solid var(--line); flex-shrink:0; }
+.tab { flex:1; font-family:var(--fu); font-size:7px; letter-spacing:2px; padding:7px 4px;
+  color:var(--dim); text-align:center; cursor:pointer; border-bottom:2px solid transparent;
+  transition:.15s; user-select:none; }
+.tab.active { color:var(--cyan); border-bottom-color:var(--cyan); }
+
+/* ── MAIN AREA ── */
+#main { flex:1; min-height:0; position:relative; }
+.view { position:absolute; inset:0; display:none; }
+.view.active { display:flex; }
+
+/* ── MAP VIEW ── */
+#view-map { flex-direction:row; }
+#map-wrap { flex:1; position:relative; min-width:0; overflow:hidden; }
+#map-cv   { position:absolute; top:0; left:0; }
+
+/* ── SIDE PANEL ── */
+#side { width:145px; flex-shrink:0; background:var(--bg2); border-left:1px solid var(--line);
+  display:flex; flex-direction:column; overflow-y:auto; overflow-x:hidden; }
+#side::-webkit-scrollbar { width:2px; }
+#side::-webkit-scrollbar-thumb { background:var(--line); }
+.blk { border-bottom:1px solid var(--line); padding:7px 8px; }
+.blk-lbl { font-family:var(--fu); font-size:6px; letter-spacing:2px; color:var(--dim); display:block; margin-bottom:4px; }
+.bval { font-size:13px; color:var(--cyan); line-height:1.2; }
+.bval.g { color:var(--green); }
+.bval.o { color:var(--orange); }
+.bval.y { color:var(--yellow); }
+.bval small { font-size:8px; color:var(--dim); }
+.brows { font-size:10px; line-height:1.9; }
+.brows span { color:var(--cyan); }
+
+/* ── ATTITUDE VIEW ── */
+#view-att { flex-direction:column; align-items:center; justify-content:center; gap:16px; background:var(--bg); padding:16px; }
+#att-big  { display:block; }
+.att-info { display:flex; gap:20px; }
+.att-box  { text-align:center; }
+.att-box .lbl { font-family:var(--fu); font-size:7px; letter-spacing:2px; color:var(--dim); }
+.att-box .num { font-size:22px; color:var(--cyan); font-family:var(--fn); }
+
+/* ── COMPASS VIEW ── */
+#view-cmp { flex-direction:column; align-items:center; justify-content:center; gap:16px; background:var(--bg); padding:16px; }
+#cmp-big  { display:block; }
+.cmp-info { display:grid; grid-template-columns:1fr 1fr; gap:10px; width:100%; max-width:280px; }
+.cmp-box  { background:var(--bg2); border:1px solid var(--line); border-radius:5px; padding:10px; text-align:center; }
+.cmp-box .lbl { font-family:var(--fu); font-size:6px; letter-spacing:2px; color:var(--dim); display:block; margin-bottom:4px; }
+.cmp-box .num { font-size:18px; color:var(--cyan); }
+
+/* ── DATA VIEW ── */
+#view-data { flex-direction:column; overflow-y:auto; padding:10px; gap:8px; background:var(--bg); }
+.data-row { display:flex; gap:8px; }
+.data-card { flex:1; background:var(--bg2); border:1px solid var(--line); border-radius:5px; padding:10px; }
+.data-card .lbl { font-family:var(--fu); font-size:6px; letter-spacing:2px; color:var(--dim); display:block; margin-bottom:6px; }
+.data-card .big { font-size:24px; color:var(--cyan); line-height:1; }
+.data-card .big.g { color:var(--green); }
+.data-card .big.o { color:var(--orange); }
+.data-card .sub  { font-size:9px; color:var(--dim); margin-top:4px; }
+.data-card .rows { font-size:11px; line-height:2; }
+.data-card .rows span { color:var(--cyan); }
+.bar-wrap { height:8px; background:var(--bg); border-radius:4px; overflow:hidden; margin-top:6px; }
+.bar-fill { height:100%; border-radius:4px; transition:width .15s; }
+
+/* ── BOTTOM BAR ── */
+#bot { background:var(--bg2); border-top:1px solid var(--line);
+  padding:8px 8px; display:flex; gap:6px; align-items:center; flex-shrink:0; }
+.btn { font-family:var(--fu); font-size:7px; letter-spacing:1.5px; padding:8px 9px;
+  border:1px solid var(--line); background:var(--bg); color:var(--text);
+  border-radius:4px; cursor:pointer; transition:.12s; white-space:nowrap; user-select:none; }
+.btn:active { opacity:.65; transform:scale(.95); }
+.btn.p  { border-color:var(--cyan);   color:var(--cyan); }
+.btn.d  { border-color:var(--red);    color:var(--red); }
+.btn.s  { border-color:var(--green);  color:var(--green); }
+.btn.y  { border-color:var(--yellow); color:var(--yellow); }
+.btn.act{ background:var(--cyan);     color:var(--bg); border-color:var(--cyan); }
+#bot-info { font-size:9px; color:var(--dim); margin-left:auto; text-align:right; line-height:1.5; }
+
+/* ── TOAST ── */
+#toast { position:fixed; bottom:58px; left:50%; transform:translateX(-50%);
+  background:var(--bg2); border:1px solid var(--cyan); color:var(--cyan);
+  font-family:var(--fu); font-size:9px; letter-spacing:2px; padding:8px 16px;
+  border-radius:5px; z-index:300; opacity:0; transition:opacity .25s; pointer-events:none; white-space:nowrap; }
+#toast.on { opacity:1; }
 </style>
 </head>
 <body>
 
-<h1>DIAGNOSTICA SENSORI</h1>
-
-<button id="btn" onclick="avvia()">▶ AVVIA SENSORI</button>
-
-<div class="guide">
-  <h2>COME USARE</h2>
-  Tieni il telefono <b style="color:#00e5ff">piatto sul tavolo, schermo verso l'alto</b>, puntato a Nord.<br>
-  Poi controlla i valori qui sotto e dimmi cosa vedi.
+<!-- ══════════ PERMISSION SCREEN ══════════ -->
+<div id="perm">
+  <div id="perm-logo">INS</div>
+  <div id="perm-sub">INERTIAL NAVIGATION SYSTEM</div>
+  <p>Navigazione 3D con accelerometro, giroscopio e magnetometro.<br>Richiede HTTPS per la bussola assoluta.</p>
+  <div id="perm-log"></div>
+  <p id="perm-warn"></p>
+  <button id="perm-btn" onclick="initSensors()">▶ AVVIA</button>
 </div>
 
-<!-- DeviceMotion -->
-<div class="card">
-  <h2><span class="status" id="s-mot"></span>DEVICEMOTION</h2>
-  <div class="row"><span class="lbl">accel.x (gravity)</span><span class="val" id="m-ax">—</span></div>
-  <div class="row"><span class="lbl">accel.y (gravity)</span><span class="val" id="m-ay">—</span></div>
-  <div class="row"><span class="lbl">accel.z (gravity)</span><span class="val" id="m-az">—</span></div>
-  <div class="row"><span class="lbl">linear.x (no grav)</span><span class="val" id="m-lx">—</span></div>
-  <div class="row"><span class="lbl">linear.y (no grav)</span><span class="val" id="m-ly">—</span></div>
-  <div class="row"><span class="lbl">linear.z (no grav)</span><span class="val" id="m-lz">—</span></div>
-  <div class="row"><span class="lbl">rotRate.alpha (°/s)</span><span class="val" id="m-ga">—</span></div>
-  <div class="row"><span class="lbl">rotRate.beta  (°/s)</span><span class="val" id="m-gb">—</span></div>
-  <div class="row"><span class="lbl">rotRate.gamma (°/s)</span><span class="val" id="m-gc">—</span></div>
-  <div class="row"><span class="lbl">interval (ms)</span><span class="val" id="m-int">—</span></div>
-  <p class="note"><b>Atteso piatto/fermo:</b> ax≈0, ay≈0, az≈−9.8 (o +9.8)<br>linear ≈ 0,0,0 — rotRate ≈ 0,0,0</p>
-</div>
+<!-- ══════════ APP ══════════ -->
+<div id="app">
 
-<!-- DeviceOrientation -->
-<div class="card">
-  <h2><span class="status" id="s-ori"></span>DEVICEORIENTATION</h2>
-  <div class="row"><span class="lbl">alpha (yaw °)</span><span class="val" id="o-a">—</span></div>
-  <div class="row"><span class="lbl">beta  (pitch °)</span><span class="val" id="o-b">—</span></div>
-  <div class="row"><span class="lbl">gamma (roll °)</span><span class="val" id="o-c">—</span></div>
-  <div class="row"><span class="lbl">absolute</span><span class="val" id="o-abs">—</span></div>
-  <p class="note"><b>Atteso piatto a Nord:</b> alpha≈0 (o 360), beta≈0, gamma≈0<br>
-  Se alpha cambia girando → magnetometro OK<br>
-  Se absolute=false → heading relativo (deriva)</p>
-</div>
+  <!-- HEADER -->
+  <div id="hdr">
+    <span id="hdr-logo">INS · 3D</span>
+    <div id="hdr-dots">
+      <div class="dot-g"><div class="dot-c" id="da"></div><div class="dot-l">ACC</div></div>
+      <div class="dot-g"><div class="dot-c" id="dg"></div><div class="dot-l">GYR</div></div>
+      <div class="dot-g"><div class="dot-c" id="dm"></div><div class="dot-l">MAG</div></div>
+      <div class="dot-g"><div class="dot-c" id="dt"></div><div class="dot-l">TRK</div></div>
+    </div>
+  </div>
 
-<!-- DeviceOrientationAbsolute -->
-<div class="card">
-  <h2><span class="status" id="s-abs"></span>DEVICEORIENTATIONABSOLUTE</h2>
-  <div class="row"><span class="lbl">alpha (yaw °)</span><span class="val" id="a-a">—</span></div>
-  <div class="row"><span class="lbl">beta  (pitch °)</span><span class="val" id="a-b">—</span></div>
-  <div class="row"><span class="lbl">gamma (roll °)</span><span class="val" id="a-c">—</span></div>
-  <p class="note"><b>Atteso puntato a Nord piatto:</b> alpha≈0 (o 360), beta≈0, gamma≈0</p>
-</div>
+  <!-- TABS -->
+  <div id="tabs">
+    <div class="tab active" onclick="switchTab('map')">🗺 MAPPA</div>
+    <div class="tab" onclick="switchTab('att')">✈ ASSETTO</div>
+    <div class="tab" onclick="switchTab('cmp')">🧭 BUSSOLA</div>
+    <div class="tab" onclick="switchTab('data')">📊 DATI</div>
+  </div>
 
-<!-- Compass calc -->
-<div class="card">
-  <h2>HEADING CALCOLATO</h2>
-  <div class="row"><span class="lbl">da deviceorientation</span><span class="val g" id="h-rel">—</span></div>
-  <div class="row"><span class="lbl">da absolute</span><span class="val g" id="h-abs">—</span></div>
-  <div class="row"><span class="lbl">da absolute (conv2)</span><span class="val w" id="h-abs2">—</span></div>
-  <p class="note">Gira il telefono verso Nord: quale valore si avvicina a <b>0°</b> o <b>360°</b>?</p>
-</div>
+  <!-- MAIN VIEWS -->
+  <div id="main">
 
-<!-- Gravity direction -->
-<div class="card">
-  <h2>DIREZIONE GRAVITA (piatto sul tavolo)</h2>
-  <div class="row"><span class="lbl">asse X dominante?</span><span class="val" id="g-x">—</span></div>
-  <div class="row"><span class="lbl">asse Y dominante?</span><span class="val" id="g-y">—</span></div>
-  <div class="row"><span class="lbl">asse Z dominante?</span><span class="val" id="g-z">—</span></div>
-  <div class="row"><span class="lbl">segno Z</span><span class="val" id="g-sign">—</span></div>
-  <p class="note">Piatto = gravità solo sull'asse Z. <b>Segno Z: −9.8 = schermo su, +9.8 = schermo giù</b></p>
-</div>
+    <!-- MAP VIEW -->
+    <div class="view active" id="view-map">
+      <div id="map-wrap"><canvas id="map-cv"></canvas></div>
+      <div id="side">
+        <div class="blk">
+          <span class="blk-lbl">POSIZIONE</span>
+          <div class="bval" id="s-px">0.00 <small>m X</small></div>
+          <div class="bval" id="s-py">0.00 <small>m Y</small></div>
+          <div class="bval o" id="s-pz">0.00 <small>m Z</small></div>
+        </div>
+        <div class="blk">
+          <span class="blk-lbl">VELOCITÀ</span>
+          <div class="bval g" id="s-spd">0.00 <small>m/s</small></div>
+        </div>
+        <div class="blk">
+          <span class="blk-lbl">HEADING</span>
+          <div class="bval" id="s-hdg">0° N</div>
+        </div>
+        <div class="blk">
+          <span class="blk-lbl">BUSSOLA</span>
+          <canvas id="cmp-sm" width="127" height="127"></canvas>
+        </div>
+        <div class="blk">
+          <span class="blk-lbl">ASSETTO</span>
+          <canvas id="att-sm" width="127" height="127"></canvas>
+        </div>
+        <div class="blk">
+          <span class="blk-lbl">PITCH · ROLL</span>
+          <div class="brows">P:<span id="s-pitch"> 0.0°</span><br>R:<span id="s-roll"> 0.0°</span></div>
+        </div>
+        <div class="blk">
+          <span class="blk-lbl">ACC LINEARE</span>
+          <div class="brows">X:<span id="s-ax"> 0.00</span><br>Y:<span id="s-ay"> 0.00</span><br>Z:<span id="s-az"> 0.00</span></div>
+        </div>
+        <div class="blk">
+          <span class="blk-lbl">LOG PUNTI</span>
+          <div class="bval" id="s-pts">0</div>
+        </div>
+      </div>
+    </div>
 
-<div class="card"><h2>LOG</h2><div id="log"></div></div>
+    <!-- ATTITUDE VIEW -->
+    <div class="view" id="view-att">
+      <canvas id="att-big"></canvas>
+      <div class="att-info">
+        <div class="att-box"><div class="lbl">PITCH</div><div class="num" id="a-pitch">0.0°</div></div>
+        <div class="att-box"><div class="lbl">ROLL</div> <div class="num" id="a-roll">0.0°</div></div>
+        <div class="att-box"><div class="lbl">YAW</div>  <div class="num" id="a-yaw">0°</div></div>
+      </div>
+    </div>
+
+    <!-- COMPASS VIEW -->
+    <div class="view" id="view-cmp">
+      <canvas id="cmp-big"></canvas>
+      <div class="cmp-info">
+        <div class="cmp-box"><span class="lbl">HEADING</span><div class="num" id="c-hdg">0°</div></div>
+        <div class="cmp-box"><span class="lbl">DIREZIONE</span><div class="num" id="c-dir">N</div></div>
+        <div class="cmp-box"><span class="lbl">MAG STATUS</span><div class="num" id="c-abs" style="font-size:11px">—</div></div>
+        <div class="cmp-box"><span class="lbl">VELOCITÀ</span><div class="num" id="c-spd">0.00</div></div>
+      </div>
+    </div>
+
+    <!-- DATA VIEW -->
+    <div class="view" id="view-data">
+      <div class="data-row">
+        <div class="data-card">
+          <span class="lbl">DISTANZA TOT</span>
+          <div class="big" id="d-dist">0.00</div>
+          <div class="sub">metri percorsi</div>
+        </div>
+        <div class="data-card">
+          <span class="lbl">VELOCITÀ MAX</span>
+          <div class="big g" id="d-vmax">0.00</div>
+          <div class="sub">m/s picco</div>
+        </div>
+      </div>
+      <div class="data-row">
+        <div class="data-card">
+          <span class="lbl">QUOTA MAX</span>
+          <div class="big o" id="d-zmax">0.00</div>
+          <div class="sub">m sopra origine</div>
+        </div>
+        <div class="data-card">
+          <span class="lbl">TEMPO TRACK</span>
+          <div class="big y" id="d-time">00:00</div>
+          <div class="sub">mm:ss</div>
+        </div>
+      </div>
+      <div class="data-row">
+        <div class="data-card" style="flex:1">
+          <span class="lbl">VELOCITÀ X · Y · Z (m/s)</span>
+          <div class="rows">X:<span id="d-vx"> 0.000</span><br>Y:<span id="d-vy"> 0.000</span><br>Z:<span id="d-vz"> 0.000</span></div>
+        </div>
+        <div class="data-card" style="flex:1">
+          <span class="lbl">POSIZIONE (m)</span>
+          <div class="rows">X:<span id="d-px"> 0.000</span><br>Y:<span id="d-py"> 0.000</span><br>Z:<span id="d-pz"> 0.000</span></div>
+        </div>
+      </div>
+      <div class="data-row">
+        <div class="data-card" style="flex:1">
+          <span class="lbl">ACCEL LINEARE (m/s²)</span>
+          <div class="rows">X:<span id="d-ax"> 0.000</span><br>Y:<span id="d-ay"> 0.000</span><br>Z:<span id="d-az"> 0.000</span></div>
+        </div>
+        <div class="data-card" style="flex:1">
+          <span class="lbl">GIROSCOPIO (°/s)</span>
+          <div class="rows">α:<span id="d-ga"> 0.0</span><br>β:<span id="d-gb"> 0.0</span><br>γ:<span id="d-gc"> 0.0</span></div>
+        </div>
+      </div>
+      <div class="data-row">
+        <div class="data-card" style="flex:1">
+          <span class="lbl">ACCEL MAGNITUDE</span>
+          <div class="big" id="d-amag">0.00</div>
+          <div class="bar-wrap"><div class="bar-fill" id="d-abar" style="background:var(--cyan);width:0%"></div></div>
+          <div class="sub">m/s² — fermo &lt; 0.15</div>
+        </div>
+      </div>
+      <div class="data-row">
+        <div class="data-card" style="flex:1">
+          <span class="lbl">SENSORI ATTIVI</span>
+          <div class="rows" id="d-sens" style="line-height:2">—</div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /main -->
+
+  <!-- BOTTOM BAR -->
+  <div id="bot">
+    <button class="btn p" id="btn-trk" onclick="toggleTracking()">▶ START</button>
+    <button class="btn d" onclick="resetNav()">↺ RESET</button>
+    <button class="btn s" onclick="exportCSV()">↓ CSV</button>
+    <button class="btn y" onclick="calibrate()">⊕ CAL</button>
+    <div id="bot-info"><span id="bi-pts">0 pts</span><br><span id="bi-mode">STANDBY</span></div>
+  </div>
+
+</div><!-- /app -->
+
+<div id="toast"></div>
 
 <script>
-var logEl = document.getElementById('log');
+// ═══════════════════════════════════════════════════
+// LOG
+// ═══════════════════════════════════════════════════
+var plogEl = document.getElementById('perm-log');
 function log(msg, col) {
-  var d = document.createElement('div');
-  d.style.color = col || '#c8dde8';
-  d.textContent = msg;
-  logEl.appendChild(d);
-  logEl.scrollTop = logEl.scrollHeight;
+  var el = document.createElement('div');
+  el.style.color = col || '#b8d0dc';
+  el.textContent = msg;
+  plogEl.appendChild(el);
+  plogEl.scrollTop = plogEl.scrollHeight;
 }
 
-var raw = { ax:0,ay:0,az:0, lx:0,ly:0,lz:0, ga:0,gb:0,gc:0, interval:0,
-            oa:0,ob:0,oc:0, oabs:false, aa:0,ab:0,ac:0 };
+// HTTPS check
+var secure = location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+if (!secure) {
+  document.getElementById('perm-warn').textContent = '⚠ Serve HTTPS per il magnetometro assoluto';
+  log('ATTENZIONE: HTTP — magnetometro potrebbe essere relativo', '#ff6060');
+} else {
+  log('HTTPS OK', '#39ff14');
+}
 
-async function avvia() {
-  document.getElementById('btn').disabled = true;
-  log('Avvio...');
+// ═══════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════
+var S = {
+  // navigation
+  px:0, py:0, pz:0,
+  vx:0, vy:0, vz:0,
+  // attitude (radians)
+  pitch:0, roll:0, yaw:0,
+  // raw accel with gravity (m/s²)
+  ax:0, ay:0, az:9.81,
+  // linear accel without gravity (m/s²)
+  lax:0, lay:0, laz:0,
+  // gyro (rad/s)
+  gx:0, gy:0, gz:0,
+  // raw gyro deg/s for display
+  gra:0, grb:0, grc:0,
+  // flags
+  hasAccel:false, hasGyro:false, hasMag:false, hasAbsOri:false, hasLinear:false,
+  // calibration bias on linear accel
+  bx:0, by:0, bz:0,
+  // filter
+  alpha:0.97,
+  // loop
+  lastT:null, tracking:false, stillCount:0,
+  // trail
+  trail:[], logData:[],
+  // stats
+  vmax:0, zmax:0, totalDist:0, trackStart:null,
+  // canvas dims (set once)
+  mapW:0, mapH:0,
+  // current tab
+  tab:'map',
+  // mag status
+  magAbs:false,
+};
 
+// ═══════════════════════════════════════════════════
+// SENSORS
+// ═══════════════════════════════════════════════════
+async function initSensors() {
+  document.getElementById('perm-btn').disabled = true;
+  log('Inizializzazione...');
+
+  // iOS permission
   if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
-    try { var r = await DeviceMotionEvent.requestPermission(); log('Motion perm: '+r, r==='granted'?'#39ff14':'#ff6060'); } catch(e){log(''+e,'#ff6060');}
+    try { var r = await DeviceMotionEvent.requestPermission(); log('Motion: '+r, r==='granted'?'#39ff14':'#ff6060'); if(r!=='granted'){return;} } catch(e){log(''+e,'#ff6060');}
   }
   if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-    try { var r2 = await DeviceOrientationEvent.requestPermission(); log('Ori perm: '+r2, r2==='granted'?'#39ff14':'#ff6060'); } catch(e){log(''+e,'#ff6060');}
+    try { var r2 = await DeviceOrientationEvent.requestPermission(); log('Ori: '+r2, r2==='granted'?'#39ff14':'#ff6060'); } catch(e){log(''+e,'#ff6060');}
   }
 
+  // DeviceMotion → accel + gyro
   if ('DeviceMotionEvent' in window) {
     window.addEventListener('devicemotion', function(e) {
+      // accel with gravity
       var a = e.accelerationIncludingGravity;
-      if (a) { raw.ax=a.x||0; raw.ay=a.y||0; raw.az=a.z||0; }
+      if (a && a.x !== null) {
+        S.ax = a.x||0; S.ay = a.y||0; S.az = a.z||0;
+        if (!S.hasAccel) { S.hasAccel=true; dotOn('da'); log('Accelerometro OK','#39ff14'); }
+      }
+      // linear accel (browser removes gravity)
       var la = e.acceleration;
-      if (la) { raw.lx=la.x||0; raw.ly=la.y||0; raw.lz=la.z||0; }
+      if (la && la.x !== null) {
+        S.lax = la.x||0; S.lay = la.y||0; S.laz = la.z||0;
+        S.hasLinear = true;
+      }
+      // gyro deg/s
       var g = e.rotationRate;
-      if (g) { raw.ga=g.alpha||0; raw.gb=g.beta||0; raw.gc=g.gamma||0; }
-      raw.interval = e.interval||0;
-      document.getElementById('s-mot').className='status ok';
+      if (g && g.alpha !== null) {
+        S.gra = g.alpha||0; S.grb = g.beta||0; S.grc = g.gamma||0;
+        // rad/s for integration — Android: alpha=Z, beta=X, gamma=Y
+        S.gz = (g.alpha||0) * Math.PI/180;
+        S.gx = (g.beta ||0) * Math.PI/180;
+        S.gy = (g.gamma||0) * Math.PI/180;
+        if (!S.hasGyro) { S.hasGyro=true; dotOn('dg'); log('Giroscopio OK','#39ff14'); }
+      }
     }, {passive:true});
-    log('DeviceMotion OK', '#39ff14');
-  } else { log('DeviceMotion non trovato','#ff6060'); }
-
-  window.addEventListener('deviceorientation', function(e) {
-    raw.oa=e.alpha||0; raw.ob=e.beta||0; raw.oc=e.gamma||0; raw.oabs=e.absolute||false;
-    document.getElementById('s-ori').className='status ok';
-  }, {passive:true});
-  log('DeviceOrientation listener OK', '#39ff14');
-
-  if ('ondeviceorientationabsolute' in window) {
-    window.addEventListener('deviceorientationabsolute', function(e) {
-      raw.aa=e.alpha||0; raw.ab=e.beta||0; raw.ac=e.gamma||0;
-      document.getElementById('s-abs').className='status ok';
-    }, {passive:true});
-    log('DeviceOrientationAbsolute listener OK', '#39ff14');
-  } else {
-    log('DeviceOrientationAbsolute non supportato','#ffcc00');
-    document.getElementById('s-abs').className='status warn';
+    log('DeviceMotion listener OK');
   }
 
-  setInterval(updateUI, 100);
-  log('Loop avviato', '#39ff14');
+  // DeviceOrientationAbsolute — best source, needs HTTPS
+  if ('ondeviceorientationabsolute' in window) {
+    window.addEventListener('deviceorientationabsolute', function(e) {
+      if (e.alpha === null || e.alpha === undefined) return;
+      // Standard: alpha=0 when pointing East on Android. Convert to North=0:
+      // heading = (360 - alpha) % 360
+      S.yaw   = ((360 - (e.alpha||0)) % 360) * Math.PI/180;
+      S.pitch = (e.beta ||0) * Math.PI/180;
+      S.roll  = (e.gamma||0) * Math.PI/180;
+      S.hasAbsOri = true; S.magAbs = true;
+      if (!S.hasMag) { S.hasMag=true; dotOn('dm'); log('Magnetometro assoluto OK','#39ff14'); }
+    }, {passive:true});
+    log('deviceorientationabsolute OK');
+  }
+
+  // DeviceOrientation fallback (relative)
+  window.addEventListener('deviceorientation', function(e) {
+    if (S.hasAbsOri) return; // already have absolute
+    if (e.alpha === null || e.alpha === undefined) return;
+    S.yaw   = ((360 - (e.alpha||0)) % 360) * Math.PI/180;
+    S.pitch = (e.beta ||0) * Math.PI/180;
+    S.roll  = (e.gamma||0) * Math.PI/180;
+    S.magAbs = !!e.absolute;
+    if (!S.hasMag) {
+      S.hasMag=true;
+      dotOn('dm');
+      log(e.absolute ? 'Magnetometro assoluto OK' : 'Orientamento relativo OK (deriva possibile)', e.absolute?'#39ff14':'#ffd600');
+    }
+  }, {passive:true});
+
+  // Try Generic Sensor API
+  tryNewSensors();
+
+  // Launch
+  setTimeout(function(){
+    document.getElementById('perm').style.display='none';
+    document.getElementById('app').style.display='flex';
+    initCanvas();
+    startLoop();
+    log('App avviata','#39ff14');
+  }, 900);
 }
 
-function f(n){ return (n>=0?'+':'')+n.toFixed(2); }
-function f1(n){ return (n>=0?'+':'')+n.toFixed(1); }
+function tryNewSensors() {
+  if (typeof AbsoluteOrientationSensor !== 'undefined') {
+    try {
+      var s = new AbsoluteOrientationSensor({frequency:60});
+      s.addEventListener('error', function(e){ log('AbsOriSensor: '+e.error.message,'#ffd600'); });
+      s.addEventListener('reading', function(){
+        var q=s.quaternion, ea=q2euler(q[0],q[1],q[2],q[3]);
+        S.pitch=ea.pitch; S.roll=ea.roll; S.yaw=ea.yaw;
+        S.hasAbsOri=true; S.magAbs=true;
+        if (!S.hasMag){ S.hasMag=true; dotOn('dm'); log('AbsoluteOrientationSensor OK','#39ff14'); }
+      });
+      s.start();
+    } catch(e){ log('AbsOriSensor: '+e.message,'#ffd600'); }
+  }
+  if (typeof LinearAccelerationSensor !== 'undefined') {
+    try {
+      var s2 = new LinearAccelerationSensor({frequency:60});
+      s2.addEventListener('error', function(e){ log('LinAcc: '+e.error.message,'#ffd600'); });
+      s2.addEventListener('reading', function(){
+        S.lax=s2.x||0; S.lay=s2.y||0; S.laz=s2.z||0; S.hasLinear=true;
+        if (!S.hasAccel){ S.hasAccel=true; dotOn('da'); }
+      });
+      s2.start();
+    } catch(e){ log('LinAcc: '+e.message,'#ffd600'); }
+  }
+  if (typeof Gyroscope !== 'undefined') {
+    try {
+      var s3 = new Gyroscope({frequency:60});
+      s3.addEventListener('error', function(e){ log('Gyro: '+e.error.message,'#ffd600'); });
+      s3.addEventListener('reading', function(){
+        S.gx=s3.x||0; S.gy=s3.y||0; S.gz=s3.z||0;
+        if (!S.hasGyro){ S.hasGyro=true; dotOn('dg'); }
+      });
+      s3.start();
+    } catch(e){ log('Gyro: '+e.message,'#ffd600'); }
+  }
+}
 
+function q2euler(x,y,z,w) {
+  return {
+    roll:  Math.atan2(2*(w*x+y*z), 1-2*(x*x+y*y)),
+    pitch: Math.asin(Math.max(-1,Math.min(1, 2*(w*y-z*x)))),
+    yaw:   Math.atan2(2*(w*z+x*y), 1-2*(y*y+z*z))
+  };
+}
+function dotOn(id){ var e=document.getElementById(id); if(e) e.classList.add('on'); }
+
+// ═══════════════════════════════════════════════════
+// CANVAS — sized ONCE by ResizeObserver
+// ═══════════════════════════════════════════════════
+var mapCv, mapCtx;
+function initCanvas() {
+  mapCv  = document.getElementById('map-cv');
+  mapCtx = mapCv.getContext('2d');
+  sizeMap();
+  if (typeof ResizeObserver !== 'undefined') {
+    new ResizeObserver(sizeMap).observe(document.getElementById('map-wrap'));
+  } else {
+    window.addEventListener('resize', sizeMap);
+  }
+  // Size attitude/compass big canvases once
+  sizeRoundCanvas('att-big', 'view-att');
+  sizeRoundCanvas('cmp-big', 'view-cmp');
+  window.addEventListener('resize', function(){
+    sizeRoundCanvas('att-big','view-att');
+    sizeRoundCanvas('cmp-big','view-cmp');
+  });
+}
+
+function sizeMap() {
+  var wrap = document.getElementById('map-wrap');
+  var w = wrap.clientWidth, h = wrap.clientHeight;
+  if (!w || !h || (w===S.mapW && h===S.mapH)) return;
+  S.mapW=w; S.mapH=h;
+  var dpr = window.devicePixelRatio||1;
+  mapCv.width  = Math.round(w*dpr);
+  mapCv.height = Math.round(h*dpr);
+  mapCv.style.width  = w+'px';
+  mapCv.style.height = h+'px';
+  mapCtx.setTransform(1,0,0,1,0,0);
+  mapCtx.scale(dpr,dpr);
+}
+
+function sizeRoundCanvas(cvId, wrapId) {
+  var cv   = document.getElementById(cvId);
+  var wrap = document.getElementById(wrapId);
+  if (!cv||!wrap) return;
+  var s = Math.min(wrap.clientWidth, wrap.clientHeight) * 0.72;
+  s = Math.max(s, 160);
+  cv.style.width=s+'px'; cv.style.height=s+'px';
+  var dpr=window.devicePixelRatio||1;
+  cv.width=Math.round(s*dpr); cv.height=Math.round(s*dpr);
+  var ctx=cv.getContext('2d');
+  ctx.setTransform(1,0,0,1,0,0);
+  ctx.scale(dpr,dpr);
+}
+
+// ═══════════════════════════════════════════════════
+// MAIN LOOP
+// ═══════════════════════════════════════════════════
+function startLoop() {
+  function loop(ts) {
+    update(ts);
+    drawMap();
+    drawCompass(document.getElementById('cmp-sm'), 63);
+    drawCompass(document.getElementById('cmp-big'), null);
+    drawAttitude(document.getElementById('att-sm'), 63);
+    drawAttitude(document.getElementById('att-big'), null);
+    updateUI();
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+}
+
+// ═══════════════════════════════════════════════════
+// INS UPDATE
+// ═══════════════════════════════════════════════════
+function update(ts) {
+  if (!S.lastT) { S.lastT=ts; return; }
+  var dt = Math.min((ts-S.lastT)/1000, 0.05);
+  S.lastT=ts;
+
+  // Attitude: if no mag/abs, use accel+gyro complementary filter
+  if (!S.hasMag) {
+    var nm = Math.sqrt(S.ax*S.ax+S.ay*S.ay+S.az*S.az)||1;
+    var pA = Math.asin(Math.max(-1,Math.min(1, S.ax/nm)));
+    var rA = Math.atan2(-S.ay, -S.az);
+    if (S.hasGyro) {
+      S.pitch = S.alpha*(S.pitch+S.gx*dt)+(1-S.alpha)*pA;
+      S.roll  = S.alpha*(S.roll +S.gy*dt)+(1-S.alpha)*rA;
+    } else {
+      S.pitch=pA; S.roll=rA;
+    }
+  }
+
+  if (!S.tracking) return;
+
+  // Best linear accel source
+  var lax, lay, laz;
+  if (S.hasLinear) {
+    lax = S.lax-S.bx; lay = S.lay-S.by; laz = S.laz-S.bz;
+  } else {
+    var g=9.81;
+    lax = S.ax - g*Math.sin(S.pitch)*Math.cos(S.roll) - S.bx;
+    lay = S.ay + g*Math.sin(S.roll) - S.by;
+    laz = S.az - g*Math.cos(S.pitch)*Math.cos(S.roll) - S.bz;
+  }
+
+  // Body → World frame (ZYX Euler)
+  var cp=Math.cos(S.pitch), sp=Math.sin(S.pitch);
+  var cr=Math.cos(S.roll),  sr=Math.sin(S.roll);
+  var cy=Math.cos(S.yaw),   sy=Math.sin(S.yaw);
+  var wx = (cy*cp)*lax + (cy*sp*sr-sy*cr)*lay + (cy*sp*cr+sy*sr)*laz;
+  var wy = (sy*cp)*lax + (sy*sp*sr+cy*cr)*lay + (sy*sp*cr-cy*sr)*laz;
+  var wz = (-sp)*lax   + (cp*sr)*lay           + (cp*cr)*laz;
+
+  // ZUPT — zero velocity update when still
+  var am = Math.sqrt(lax*lax+lay*lay+laz*laz);
+  if (am < 0.15) {
+    S.stillCount++;
+    if (S.stillCount > 8) { S.vx*=0.55; S.vy*=0.55; S.vz*=0.55; }
+  } else { S.stillCount=0; }
+
+  // Dead-band threshold on small noise
+  var thr=0.07;
+  S.vx += (Math.abs(wx)>thr ? wx : 0)*dt;
+  S.vy += (Math.abs(wy)>thr ? wy : 0)*dt;
+  S.vz += (Math.abs(wz)>thr ? wz : 0)*dt;
+
+  var prevX=S.px, prevY=S.py, prevZ=S.pz;
+  S.px+=S.vx*dt; S.py+=S.vy*dt; S.pz+=S.vz*dt;
+
+  // Stats
+  var spd=Math.sqrt(S.vx*S.vx+S.vy*S.vy+S.vz*S.vz);
+  if (spd>S.vmax) S.vmax=spd;
+  if (S.pz>S.zmax) S.zmax=S.pz;
+  var step=Math.sqrt(Math.pow(S.px-prevX,2)+Math.pow(S.py-prevY,2)+Math.pow(S.pz-prevZ,2));
+  S.totalDist+=step;
+
+  // Trail point
+  var last=S.trail[S.trail.length-1];
+  if (!last || Math.sqrt(Math.pow(S.px-last.x,2)+Math.pow(S.py-last.y,2)+Math.pow(S.pz-last.z,2))>0.04) {
+    var now=Date.now();
+    S.trail.push({x:S.px,y:S.py,z:S.pz,t:now});
+    S.logData.push({t:now,
+      x:S.px.toFixed(3),y:S.py.toFixed(3),z:S.pz.toFixed(3),
+      vx:S.vx.toFixed(3),vy:S.vy.toFixed(3),vz:S.vz.toFixed(3),
+      pitch:(S.pitch*180/Math.PI).toFixed(1),
+      roll:(S.roll*180/Math.PI).toFixed(1),
+      yaw:((S.yaw*180/Math.PI+360)%360).toFixed(1),
+      spd:spd.toFixed(3),
+    });
+    if (S.trail.length>4000) S.trail.shift();
+  }
+}
+
+// ═══════════════════════════════════════════════════
+// DRAW MAP
+// ═══════════════════════════════════════════════════
+function drawMap() {
+  if (!mapCtx||!S.mapW||!S.mapH) return;
+  var W=S.mapW, H=S.mapH, ctx=mapCtx, sc=50;
+  var ox=W/2-S.px*sc, oy=H/2+S.py*sc;
+
+  ctx.fillStyle='#070b10'; ctx.fillRect(0,0,W,H);
+
+  // Grid
+  ctx.strokeStyle='rgba(24,36,48,0.9)'; ctx.lineWidth=0.5;
+  var gx0=((ox%sc)+sc)%sc, gy0=((oy%sc)+sc)%sc;
+  for(var x=gx0;x<W;x+=sc){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}
+  for(var y=gy0;y<H;y+=sc){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
+
+  // Grid labels (meters)
+  ctx.fillStyle='rgba(58,90,106,0.6)'; ctx.font='8px Share Tech Mono'; ctx.textAlign='center';
+  for(var xi=-20;xi<=20;xi++){
+    var px2=ox+xi*sc; if(px2<5||px2>W-5) continue;
+    ctx.fillText(xi+'m', px2, H/2+10);
+  }
+  ctx.textAlign='right';
+  for(var yi=-20;yi<=20;yi++){
+    var py2=oy-yi*sc; if(py2<10||py2>H-5) continue;
+    if(yi!==0) ctx.fillText(yi+'m', W/2-4, py2+4);
+  }
+
+  // Origin axes
+  ctx.strokeStyle='rgba(0,229,255,0.08)'; ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(ox,0);ctx.lineTo(ox,H);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(0,oy);ctx.lineTo(W,oy);ctx.stroke();
+  ctx.strokeStyle='rgba(0,229,255,0.3)'; ctx.lineWidth=1;
+  ctx.beginPath();ctx.arc(ox,oy,5,0,Math.PI*2);ctx.stroke();
+  // North indicator at origin
+  var ni=20;
+  ctx.strokeStyle='rgba(255,107,53,0.5)'; ctx.lineWidth=1.5;
+  ctx.beginPath();ctx.moveTo(ox,oy);ctx.lineTo(ox,oy-ni);ctx.stroke();
+  ctx.fillStyle='rgba(255,107,53,0.6)'; ctx.font='7px Orbitron'; ctx.textAlign='center';
+  ctx.fillText('N',ox,oy-ni-4);
+
+  // Trail colored by altitude
+  if (S.trail.length>1) {
+    var zArr=S.trail.map(function(p){return p.z;});
+    var zMin=Math.min.apply(null,zArr), zMax=Math.max.apply(null,zArr)+0.001;
+    ctx.lineWidth=2.5;
+    for(var i=1;i<S.trail.length;i++){
+      var p0=S.trail[i-1], p1=S.trail[i];
+      var t=(p1.z-zMin)/(zMax-zMin);
+      var r2=Math.round(t*255), g2=Math.round((1-t)*220), b2=Math.round((1-t)*255);
+      ctx.strokeStyle='rgba('+r2+','+g2+','+b2+',0.85)';
+      ctx.beginPath();
+      ctx.moveTo(ox+p0.x*sc, oy-p0.y*sc);
+      ctx.lineTo(ox+p1.x*sc, oy-p1.y*sc);
+      ctx.stroke();
+    }
+  }
+
+  // Drone icon
+  var dx=ox+S.px*sc, dy=oy-S.py*sc;
+  ctx.save(); ctx.translate(dx,dy); ctx.rotate(-S.yaw);
+  ctx.shadowColor='#00e5ff'; ctx.shadowBlur=16;
+  // Body
+  ctx.fillStyle='#00e5ff'; ctx.beginPath(); ctx.arc(0,0,5,0,Math.PI*2); ctx.fill();
+  // Heading arrow
+  ctx.strokeStyle='#00e5ff'; ctx.lineWidth=2.5;
+  ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(0,-18);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(-5,-13);ctx.lineTo(0,-20);ctx.lineTo(5,-13);ctx.stroke();
+  // Arms
+  var arms=[[-11,-11],[11,-11],[-11,11],[11,11]];
+  for(var j=0;j<arms.length;j++){
+    var av=arms[j];
+    ctx.strokeStyle='rgba(0,229,255,0.3)'; ctx.lineWidth=1.5;
+    ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(av[0],av[1]);ctx.stroke();
+    ctx.beginPath();ctx.arc(av[0],av[1],3,0,Math.PI*2);ctx.stroke();
+  }
+  ctx.restore(); ctx.shadowBlur=0;
+
+  // Altitude bar (right edge)
+  var bH=H*0.5, bY=(H-bH)/2;
+  ctx.fillStyle='rgba(8,14,22,0.88)'; ctx.fillRect(W-25,bY,13,bH);
+  ctx.strokeStyle='#182430'; ctx.lineWidth=0.5; ctx.strokeRect(W-25,bY,13,bH);
+  var zN=Math.max(0,Math.min(1,(S.pz+3)/8));
+  var fH=zN*bH;
+  var gr=ctx.createLinearGradient(0,bY+bH,0,bY);
+  gr.addColorStop(0,'#ff3d3d');gr.addColorStop(0.4,'#ff6b35');gr.addColorStop(0.7,'#00e5ff');gr.addColorStop(1,'#39ff14');
+  ctx.fillStyle=gr; ctx.fillRect(W-23,bY+bH-fH,9,fH);
+  ctx.fillStyle='#3a5a6a'; ctx.font='6px Share Tech Mono'; ctx.textAlign='center';
+  ctx.fillText('ALT',W-18,bY-5);
+  ctx.fillStyle='#b8d0dc'; ctx.fillText(S.pz.toFixed(1),W-18,bY+bH+10);
+
+  // Scale bar (bottom left)
+  var scX=12, scY=H-14;
+  ctx.strokeStyle='rgba(0,229,255,0.25)'; ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(scX,scY);ctx.lineTo(scX+sc,scY);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(scX,scY-4);ctx.lineTo(scX,scY+4);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(scX+sc,scY-4);ctx.lineTo(scX+sc,scY+4);ctx.stroke();
+  ctx.fillStyle='#3a5a6a'; ctx.font='8px Share Tech Mono'; ctx.textAlign='left';
+  ctx.fillText('1 m',scX+sc/2-8,H-2);
+
+  // Speed vector arrow from drone
+  if (S.tracking) {
+    var vsc=8, vx2=S.vx*vsc, vy2=-S.vy*vsc;
+    var vm=Math.sqrt(vx2*vx2+vy2*vy2);
+    if (vm>2) {
+      ctx.strokeStyle='rgba(57,255,20,0.5)'; ctx.lineWidth=2;
+      ctx.beginPath();ctx.moveTo(dx,dy);ctx.lineTo(dx+vx2,dy+vy2);ctx.stroke();
+    }
+  }
+}
+
+// ═══════════════════════════════════════════════════
+// DRAW COMPASS
+// ═══════════════════════════════════════════════════
+function drawCompass(cv, overrideR) {
+  if (!cv) return;
+  var ctx=cv.getContext('2d');
+  // Use CSS size for layout, actual pixel buffer for drawing
+  var W=cv.width/(window.devicePixelRatio||1);
+  var H=cv.height/(window.devicePixelRatio||1);
+  var cx=W/2, cy=H/2;
+  var r=overrideR||Math.min(cx,cy)-4;
+  ctx.clearRect(0,0,W*(window.devicePixelRatio||1),H*(window.devicePixelRatio||1));
+
+  // Background circle
+  var bg=ctx.createRadialGradient(cx,cy,0,cx,cy,r);
+  bg.addColorStop(0,'#0c1219'); bg.addColorStop(1,'#070b10');
+  ctx.fillStyle=bg; ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.fill();
+
+  // Outer ring
+  ctx.strokeStyle='#182430'; ctx.lineWidth=2;
+  ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.stroke();
+
+  // Tick marks
+  for(var i=0;i<72;i++){
+    var a=i/72*Math.PI*2;
+    var big=i%18===0, med=i%6===0;
+    var len=big?r*0.15:med?r*0.09:r*0.05;
+    ctx.strokeStyle=big?'#00e5ff':med?'#182430':'#111a24';
+    ctx.lineWidth=big?1.5:0.7;
+    ctx.beginPath();
+    ctx.moveTo(cx+Math.sin(a)*r, cy-Math.cos(a)*r);
+    ctx.lineTo(cx+Math.sin(a)*(r-len), cy-Math.cos(a)*(r-len));
+    ctx.stroke();
+  }
+
+  // Cardinal labels — fixed on screen, dial rotates
+  var yd=((S.yaw*180/Math.PI)%360+360)%360;
+  var cards=[['N',0,'#ff6b35'],['NE',45,'#3a5a6a'],['E',90,'#3a5a6a'],['SE',135,'#3a5a6a'],
+             ['S',180,'#3a5a6a'],['SW',225,'#3a5a6a'],['W',270,'#3a5a6a'],['NW',315,'#3a5a6a']];
+  var lr=r*0.72;
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  for(var i=0;i<cards.length;i++){
+    var c=cards[i];
+    var ang=(c[1]-yd)*Math.PI/180;
+    ctx.fillStyle=c[2];
+    ctx.font=(c[0]==='N'?'bold ':'')+(r>80?'9px':'7px')+' Orbitron';
+    ctx.fillText(c[0], cx+Math.sin(ang)*lr, cy-Math.cos(ang)*lr);
+  }
+
+  // Needle
+  ctx.save(); ctx.translate(cx,cy); ctx.rotate(S.yaw);
+  // North (red)
+  ctx.fillStyle='#ff6b35'; ctx.shadowColor='#ff6b35'; ctx.shadowBlur=10;
+  ctx.beginPath();
+  ctx.moveTo(0,-(r*0.78));
+  ctx.lineTo(-r*0.06, 0);
+  ctx.lineTo(r*0.06, 0);
+  ctx.closePath(); ctx.fill();
+  // South (dim)
+  ctx.fillStyle='#182430'; ctx.shadowBlur=0;
+  ctx.beginPath();
+  ctx.moveTo(0, r*0.78);
+  ctx.lineTo(-r*0.06, 0);
+  ctx.lineTo(r*0.06, 0);
+  ctx.closePath(); ctx.fill();
+  // Center pivot
+  ctx.fillStyle='#00e5ff'; ctx.shadowColor='#00e5ff'; ctx.shadowBlur=8;
+  ctx.beginPath(); ctx.arc(0,0,r*0.07,0,Math.PI*2); ctx.fill();
+  ctx.restore(); ctx.shadowBlur=0;
+
+  // Center heading text
+  ctx.fillStyle='#00e5ff'; ctx.font=(r>80?'11':'9')+'px Share Tech Mono';
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText(yd.toFixed(0)+'°', cx, cy);
+}
+
+// ═══════════════════════════════════════════════════
+// DRAW ATTITUDE
+// ═══════════════════════════════════════════════════
+function drawAttitude(cv, overrideR) {
+  if (!cv) return;
+  var ctx=cv.getContext('2d');
+  var W=cv.width/(window.devicePixelRatio||1);
+  var H=cv.height/(window.devicePixelRatio||1);
+  var cx=W/2, cy=H/2;
+  var r=overrideR||Math.min(cx,cy)-4;
+  ctx.clearRect(0,0,cv.width,cv.height);
+
+  // Clip to circle
+  ctx.save();
+  ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.clip();
+
+  // Pitch offset in pixels (45deg = full radius)
+  var pp=S.pitch*(r/(Math.PI/4));
+
+  ctx.save();
+  ctx.translate(cx,cy); ctx.rotate(S.roll);
+
+  // Sky
+  ctx.fillStyle='#0a2a44'; ctx.fillRect(-r*2,-r*2-1,r*4,r*2+pp+1);
+  // Ground
+  ctx.fillStyle='#3a1800'; ctx.fillRect(-r*2,pp,r*4,r*2+1);
+
+  // Horizon line
+  ctx.strokeStyle='rgba(200,220,230,0.9)'; ctx.lineWidth=1.5;
+  ctx.beginPath();ctx.moveTo(-r*2,pp);ctx.lineTo(r*2,pp);ctx.stroke();
+
+  // Pitch ladder
+  for(var p=-60;p<=60;p+=10){
+    if(!p) continue;
+    var ly=pp-p*(r/45);
+    if(Math.abs(ly)>r*1.1) continue;
+    var llen=p%30===0?r*0.35:p%20===0?r*0.25:r*0.14;
+    ctx.strokeStyle='rgba(176,208,220,0.35)'; ctx.lineWidth=0.7;
+    ctx.beginPath();ctx.moveTo(-llen,ly);ctx.lineTo(llen,ly);ctx.stroke();
+    if(p%10===0){
+      ctx.fillStyle='rgba(176,208,220,0.4)'; ctx.font='6px Share Tech Mono'; ctx.textAlign='right';
+      ctx.fillText(p+'°', -llen-3, ly+3);
+    }
+  }
+  ctx.restore();
+
+  // Fixed aircraft crosshair
+  ctx.strokeStyle='#ffd600'; ctx.lineWidth=2.5; ctx.shadowColor='#ffd600'; ctx.shadowBlur=6;
+  ctx.beginPath();ctx.moveTo(cx-r*0.52,cy);ctx.lineTo(cx-r*0.18,cy);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(cx+r*0.18,cy);ctx.lineTo(cx+r*0.52,cy);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(cx,cy-r*0.12);ctx.lineTo(cx,cy+r*0.12);ctx.stroke();
+  ctx.beginPath();ctx.arc(cx,cy,r*0.055,0,Math.PI*2);ctx.stroke();
+  ctx.shadowBlur=0;
+
+  ctx.restore(); // unclip
+
+  // Outer ring
+  ctx.strokeStyle='#182430'; ctx.lineWidth=2;
+  ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.stroke();
+
+  // Roll arc ticks
+  for(var deg=-60;deg<=60;deg+=10){
+    var rad=(deg-90)*Math.PI/180;
+    var tlen=deg%30===0?r*0.1:r*0.055;
+    ctx.strokeStyle='rgba(0,229,255,0.3)'; ctx.lineWidth=0.8;
+    ctx.beginPath();
+    ctx.moveTo(cx+Math.cos(rad)*r, cy+Math.sin(rad)*r);
+    ctx.lineTo(cx+Math.cos(rad)*(r-tlen), cy+Math.sin(rad)*(r-tlen));
+    ctx.stroke();
+  }
+
+  // Roll pointer triangle
+  var rp=S.roll-Math.PI/2;
+  ctx.fillStyle='#ffd600'; ctx.shadowColor='#ffd600'; ctx.shadowBlur=4;
+  ctx.save();
+  ctx.translate(cx+Math.cos(rp)*r, cy+Math.sin(rp)*r);
+  ctx.rotate(rp+Math.PI/2);
+  ctx.beginPath();ctx.moveTo(0,-r*0.1);ctx.lineTo(-r*0.055,0);ctx.lineTo(r*0.055,0);ctx.closePath();ctx.fill();
+  ctx.restore();
+  ctx.shadowBlur=0;
+}
+
+// ═══════════════════════════════════════════════════
+// UI UPDATE
+// ═══════════════════════════════════════════════════
 function updateUI() {
-  // DeviceMotion
-  set('m-ax', f(raw.ax)); set('m-ay', f(raw.ay)); set('m-az', f(raw.az));
-  set('m-lx', f(raw.lx)); set('m-ly', f(raw.ly)); set('m-lz', f(raw.lz));
-  set('m-ga', f1(raw.ga)); set('m-gb', f1(raw.gb)); set('m-gc', f1(raw.gc));
-  set('m-int', raw.interval.toFixed(1)+' ms');
+  var f3=function(n){return (n>=0?'+':'')+n.toFixed(3);};
+  var f2=function(n){return n.toFixed(2);};
+  var f1=function(n){return n.toFixed(1);};
 
-  // DeviceOrientation
-  set('o-a', f1(raw.oa)+'°'); set('o-b', f1(raw.ob)+'°'); set('o-c', f1(raw.oc)+'°');
-  set('o-abs', raw.oabs ? '✓ SI' : '✗ NO');
+  var spd=Math.sqrt(S.vx*S.vx+S.vy*S.vy+S.vz*S.vz);
+  var yd=((S.yaw*180/Math.PI)%360+360)%360;
+  var pitchD=S.pitch*180/Math.PI, rollD=S.roll*180/Math.PI;
+  var am=Math.sqrt(S.lax*S.lax+S.lay*S.lay+S.laz*S.laz);
 
-  // Absolute
-  set('a-a', f1(raw.aa)+'°'); set('a-b', f1(raw.ab)+'°'); set('a-c', f1(raw.ac)+'°');
+  // Side panel
+  set('s-px', f2(S.px)+' <small>m X</small>');
+  set('s-py', f2(S.py)+' <small>m Y</small>');
+  set('s-pz', f2(S.pz)+' <small>m Z</small>');
+  set('s-spd', f2(spd)+' <small>m/s</small>');
+  set('s-hdg', yd.toFixed(0)+'° '+dirLabel(yd));
+  sett('s-pitch', ' '+f1(pitchD)+'°');
+  sett('s-roll',  ' '+f1(rollD)+'°');
+  sett('s-ax', ' '+f2(S.lax));
+  sett('s-ay', ' '+f2(S.lay));
+  sett('s-az', ' '+f2(S.laz));
+  set('s-pts', S.trail.length+'');
 
-  // Heading calculations
-  // conv1: alpha diretto
-  var h1 = ((raw.oa % 360) + 360) % 360;
-  // conv2: 360 - alpha
-  var h2 = ((360 - raw.oa) % 360 + 360) % 360;
-  // absolute
-  var ha1 = ((raw.aa % 360) + 360) % 360;
-  var ha2 = ((360 - raw.aa) % 360 + 360) % 360;
-  set('h-rel', h1.toFixed(1)+'°  (360-α='+h2.toFixed(1)+'°)');
-  set('h-abs', ha1.toFixed(1)+'°');
-  set('h-abs2', ha2.toFixed(1)+'°  (360-α)');
+  // Attitude tab
+  sett('a-pitch', f1(pitchD)+'°');
+  sett('a-roll',  f1(rollD)+'°');
+  sett('a-yaw',   yd.toFixed(0)+'°');
 
-  // Gravity
-  var ax=Math.abs(raw.ax), ay=Math.abs(raw.ay), az=Math.abs(raw.az);
-  set('g-x', ax.toFixed(2)+' m/s²  '+(ax>8?'← GRAVITA SU X!':''));
-  set('g-y', ay.toFixed(2)+' m/s²  '+(ay>8?'← GRAVITA SU Y!':''));
-  set('g-z', az.toFixed(2)+' m/s²  '+(az>8?'← GRAVITA SU Z ✓':''));
-  set('g-sign', raw.az < 0 ? raw.az.toFixed(2)+' (schermo verso l\'alto ✓)' : raw.az.toFixed(2)+' (schermo verso il basso)');
+  // Compass tab
+  sett('c-hdg', yd.toFixed(0)+'°');
+  sett('c-dir', dirLabel(yd));
+  sett('c-abs', S.magAbs ? '✓ ASSOLUTO' : '~ RELATIVO');
+  sett('c-spd', f2(spd));
+
+  // Data tab
+  sett('d-dist', f2(S.totalDist));
+  sett('d-vmax', f2(S.vmax));
+  sett('d-zmax', f2(S.zmax));
+  // Elapsed time
+  if (S.trackStart) {
+    var sec=Math.floor((Date.now()-S.trackStart)/1000);
+    var mm=String(Math.floor(sec/60)).padStart(2,'0');
+    var ss=String(sec%60).padStart(2,'0');
+    sett('d-time', mm+':'+ss);
+  }
+  sett('d-vx', f3(S.vx)); sett('d-vy', f3(S.vy)); sett('d-vz', f3(S.vz));
+  sett('d-px', f3(S.px)); sett('d-py', f3(S.py)); sett('d-pz', f3(S.pz));
+  sett('d-ax', f3(S.lax)); sett('d-ay', f3(S.lay)); sett('d-az', f3(S.laz));
+  sett('d-ga', f1(S.gra)); sett('d-gb', f1(S.grb)); sett('d-gc', f1(S.grc));
+  sett('d-amag', f2(am));
+  var abar=document.getElementById('d-abar');
+  if(abar) abar.style.width=Math.min(100,am/2*100)+'%';
+
+  // Sensor status
+  var sens='ACC:'+yn(S.hasAccel)+' GYR:'+yn(S.hasGyro)+' MAG:'+yn(S.hasMag)+'\nLIN:'+yn(S.hasLinear)+' ABS:'+yn(S.hasAbsOri);
+  sett('d-sens', sens);
+
+  // Bottom bar
+  sett('bi-pts', S.logData.length+' pts');
+  sett('bi-mode', S.tracking ? 'TRACKING' : 'STANDBY');
+
+  // Header dot track
+  document.getElementById('dt').classList.toggle('on', S.tracking);
 }
 
-function set(id, val) {
-  var el = document.getElementById(id);
-  if (el) el.textContent = val;
+function set(id, html){ var e=document.getElementById(id); if(e) e.innerHTML=html; }
+function sett(id, txt){ var e=document.getElementById(id); if(e) e.textContent=txt; }
+function yn(v){ return v?'✓':'✗'; }
+function dirLabel(d){ return ['N','NE','E','SE','S','SW','W','NW'][Math.round(d/45)%8]; }
+
+// ═══════════════════════════════════════════════════
+// TABS
+// ═══════════════════════════════════════════════════
+function switchTab(name) {
+  S.tab=name;
+  var tabs=document.querySelectorAll('.tab');
+  var views=document.querySelectorAll('.view');
+  tabs.forEach(function(t,i){ t.classList.toggle('active', t.getAttribute('onclick').indexOf("'"+name+"'")>=0); });
+  views.forEach(function(v){ v.classList.toggle('active', v.id==='view-'+name); });
+  // Resize big canvases when switching to their tab
+  if(name==='att') setTimeout(function(){sizeRoundCanvas('att-big','view-att');},50);
+  if(name==='cmp') setTimeout(function(){sizeRoundCanvas('cmp-big','view-cmp');},50);
+}
+
+// ═══════════════════════════════════════════════════
+// CONTROLS
+// ═══════════════════════════════════════════════════
+function toggleTracking(){
+  S.tracking=!S.tracking;
+  var btn=document.getElementById('btn-trk');
+  if(S.tracking){
+    btn.textContent='■ STOP'; btn.classList.remove('p'); btn.classList.add('act');
+    if(!S.trackStart) S.trackStart=Date.now();
+    toast('TRACKING ON');
+  } else {
+    btn.textContent='▶ START'; btn.classList.add('p'); btn.classList.remove('act');
+    toast('TRACKING OFF');
+  }
+}
+
+function resetNav(){
+  S.px=S.py=S.pz=S.vx=S.vy=S.vz=0;
+  S.trail=[]; S.logData=[]; S.stillCount=0;
+  S.vmax=0; S.zmax=0; S.totalDist=0; S.trackStart=null;
+  S.tracking=false;
+  var btn=document.getElementById('btn-trk');
+  btn.textContent='▶ START'; btn.classList.add('p'); btn.classList.remove('act');
+  sett('d-time','00:00');
+  toast('RESET OK');
+}
+
+function calibrate(){
+  toast('CAL — tieni fermo 3 secondi');
+  var samp=[];
+  var id=setInterval(function(){
+    samp.push({x:S.lax,y:S.lay,z:S.laz});
+  },50);
+  setTimeout(function(){
+    clearInterval(id);
+    if(samp.length){
+      S.bx=samp.reduce(function(a,v){return a+v.x;},0)/samp.length;
+      S.by=samp.reduce(function(a,v){return a+v.y;},0)/samp.length;
+      S.bz=samp.reduce(function(a,v){return a+v.z;},0)/samp.length;
+    }
+    // Also zero velocity and position drift
+    S.vx=S.vy=S.vz=0;
+    toast('CAL OK  bias:('+S.bx.toFixed(3)+', '+S.by.toFixed(3)+', '+S.bz.toFixed(3)+')');
+  },3000);
+}
+
+function exportCSV(){
+  if(!S.logData.length){toast('NESSUN DATO DA ESPORTARE');return;}
+  var hdr='timestamp_ms,x_m,y_m,z_m,vx_ms,vy_ms,vz_ms,pitch_deg,roll_deg,yaw_deg,speed_ms\n';
+  var rows=S.logData.map(function(r){
+    return r.t+','+r.x+','+r.y+','+r.z+','+r.vx+','+r.vy+','+r.vz+','+r.pitch+','+r.roll+','+r.yaw+','+r.spd;
+  }).join('\n');
+  var b=new Blob([hdr+rows],{type:'text/csv'});
+  var a=document.createElement('a');
+  a.href=URL.createObjectURL(b); a.download='ins_'+Date.now()+'.csv'; a.click();
+  toast('ESPORTATI '+S.logData.length+' PUNTI');
+}
+
+// ═══════════════════════════════════════════════════
+// TOAST
+// ═══════════════════════════════════════════════════
+var _tt;
+function toast(msg){
+  var t=document.getElementById('toast');
+  t.textContent=msg; t.classList.add('on');
+  clearTimeout(_tt); _tt=setTimeout(function(){t.classList.remove('on');},2500);
 }
 </script>
 </body>
-  </html>
-  
+</html>
