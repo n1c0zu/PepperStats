@@ -3,157 +3,205 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<meta name="mobile-web-app-capable" content="yes">
-<title>INS 3D</title>
-<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@700&display=swap" rel="stylesheet">
+<title>Diagnostica Sensori</title>
 <style>
-:root{
-  --bg:#0a0e14;--bg2:#0f1520;--border:#1e3a52;
-  --accent:#00e5ff;--accent2:#ff6b35;--accent3:#39ff14;
-  --warn:#ffcc00;--text:#c8dde8;--dim:#4a6a7a;
-  --fn:'Share Tech Mono',monospace;--fu:'Orbitron',monospace;
-}
-*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
-html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:var(--fn);}
-
-/* \u2500\u2500 PERM \u2500\u2500 */
-#perm{position:fixed;inset:0;z-index:100;background:var(--bg);
-  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:24px;}
-#perm h2{font-family:var(--fu);color:var(--accent);font-size:13px;letter-spacing:3px;}
-#perm p{font-size:11px;color:var(--dim);text-align:center;line-height:1.7;max-width:320px;}
-#perm-warn{font-size:10px;color:#ff6060;text-align:center;}
-#dlog{width:100%;max-width:340px;background:#0a0e14;border:1px solid var(--border);
-  border-radius:4px;padding:8px;font-size:10px;height:140px;overflow-y:auto;line-height:1.6;}
-.btn-start{font-family:var(--fu);font-size:12px;letter-spacing:2px;padding:13px 32px;
-  border:1px solid var(--accent);background:transparent;color:var(--accent);
-  border-radius:4px;cursor:pointer;}
-
-/* \u2500\u2500 APP \u2500\u2500 */
-#app{display:none;flex-direction:column;height:100vh;}
-
-/* header */
-#hdr{background:var(--bg2);border-bottom:1px solid var(--border);
-  padding:6px 12px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
-#hdr-title{font-family:var(--fu);font-size:11px;letter-spacing:4px;color:var(--accent);}
-#dots{display:flex;gap:10px;}
-.dot-wrap{display:flex;flex-direction:column;align-items:center;gap:2px;}
-.dot-c{width:8px;height:8px;border-radius:50%;background:var(--dim);}
-.dot-c.on{background:var(--accent3);animation:blink 2s infinite;}
-.dot-l{font-family:var(--fu);font-size:5px;letter-spacing:1px;color:var(--dim);}
-@keyframes blink{0%,100%{opacity:1}50%{opacity:.35}}
-
-/* main */
-#main{display:flex;flex:1;min-height:0;}
-#map-wrap{flex:1;position:relative;min-width:0;}
-/* canvas is sized once via JS resize observer - NO width/height reset in draw loop */
-#map-cv{position:absolute;top:0;left:0;width:100%;height:100%;}
-
-/* side */
-#side{width:148px;flex-shrink:0;background:var(--bg2);
-  display:flex;flex-direction:column;overflow-y:auto;border-left:1px solid var(--border);}
-#side::-webkit-scrollbar{width:3px;}
-#side::-webkit-scrollbar-thumb{background:var(--border);}
-.blk{border-bottom:1px solid var(--border);padding:7px 9px;}
-.blk lbl{font-family:var(--fu);font-size:6px;letter-spacing:2px;color:var(--dim);display:block;margin-bottom:3px;}
-.val{font-size:13px;color:var(--accent);line-height:1.2;}
-.val.g{color:var(--accent3);}
-.val.o{color:var(--accent2);}
-.val small{font-size:9px;color:var(--dim);}
-.sm{font-size:10px;line-height:1.85;color:var(--text);}
-
-/* bottom */
-#bot{background:var(--bg2);border-top:1px solid var(--border);
-  padding:7px 8px;display:flex;gap:6px;align-items:center;flex-shrink:0;}
-.btn{font-family:var(--fu);font-size:7px;letter-spacing:1.5px;padding:8px 9px;
-  border:1px solid var(--border);background:var(--bg);color:var(--text);
-  border-radius:3px;cursor:pointer;transition:.12s;white-space:nowrap;user-select:none;}
-.btn:active{opacity:.7;}
-.btn.p{border-color:var(--accent);color:var(--accent);}
-.btn.d{border-color:#ff5050;color:#ff5050;}
-.btn.s{border-color:var(--accent3);color:var(--accent3);}
-.btn.active{background:var(--accent);color:var(--bg);}
-#lc{font-size:9px;color:var(--dim);margin-left:auto;}
-
-/* toast */
-#toast{position:fixed;bottom:60px;left:50%;transform:translateX(-50%);
-  background:var(--bg2);border:1px solid var(--accent);color:var(--accent);
-  font-family:var(--fu);font-size:9px;letter-spacing:2px;
-  padding:7px 16px;border-radius:4px;z-index:200;
-  opacity:0;transition:opacity .25s;pointer-events:none;white-space:nowrap;}
-#toast.on{opacity:1;}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: #0a0e14; color: #c8dde8; font-family: 'Courier New', monospace; font-size: 13px; padding: 12px; }
+h1 { color: #00e5ff; font-size: 14px; letter-spacing: 3px; margin-bottom: 14px; text-align: center; }
+.card { background: #0f1520; border: 1px solid #1e3a52; border-radius: 6px; padding: 12px; margin-bottom: 10px; }
+.card h2 { font-size: 10px; letter-spacing: 2px; color: #4a6a7a; margin-bottom: 10px; }
+.row { display: flex; justify-content: space-between; padding: 3px 0; border-bottom: 1px solid #111927; }
+.lbl { color: #4a6a7a; }
+.val { color: #00e5ff; font-weight: bold; min-width: 90px; text-align: right; }
+.val.g { color: #39ff14; }
+.val.o { color: #ff6b35; }
+.val.w { color: #ffcc00; }
+.status { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #1e3a52; margin-right: 6px; vertical-align: middle; }
+.status.ok { background: #39ff14; box-shadow: 0 0 6px #39ff14; }
+.status.warn { background: #ffcc00; }
+.note { font-size: 10px; color: #4a6a7a; margin-top: 6px; line-height: 1.6; }
+.note b { color: #ffcc00; }
+button { font-family: 'Courier New', monospace; font-size: 12px; letter-spacing: 2px;
+  padding: 12px 24px; border: 1px solid #00e5ff; background: transparent;
+  color: #00e5ff; border-radius: 4px; cursor: pointer; display: block; margin: 0 auto 14px; width: 100%; }
+#log { background: #060a0f; border: 1px solid #1e3a52; border-radius: 4px;
+  padding: 8px; height: 120px; overflow-y: auto; font-size: 10px; line-height: 1.6; }
+.guide { background: #0f1520; border: 1px solid #1e3a52; border-radius: 6px;
+  padding: 12px; margin-bottom: 10px; font-size: 11px; line-height: 1.8; color: #c8dde8; }
+.guide h2 { font-size: 10px; letter-spacing: 2px; color: #ff6b35; margin-bottom: 8px; }
 </style>
 </head>
 <body>
 
-<!-- PERMISSION SCREEN -->
-<div id="perm">
-  <h2>INS \u00b7 3D NAVIGATOR</h2>
-  <p>Naviga con accelerometro, giroscopio e magnetometro.<br>Richiede HTTPS per il magnetometro.</p>
-  <div id="dlog"></div>
-  <p id="perm-warn"></p>
-  <button class="btn-start" id="btn-avvia" onclick="initSensors()">\u25b6 AVVIA</button>
+<h1>DIAGNOSTICA SENSORI</h1>
+
+<button id="btn" onclick="avvia()">▶ AVVIA SENSORI</button>
+
+<div class="guide">
+  <h2>COME USARE</h2>
+  Tieni il telefono <b style="color:#00e5ff">piatto sul tavolo, schermo verso l'alto</b>, puntato a Nord.<br>
+  Poi controlla i valori qui sotto e dimmi cosa vedi.
 </div>
 
-<!-- APP -->
-<div id="app">
-  <div id="hdr">
-    <span id="hdr-title">INS 3D</span>
-    <div id="dots">
-      <div class="dot-wrap"><div class="dot-c" id="da"></div><div class="dot-l">ACC</div></div>
-      <div class="dot-wrap"><div class="dot-c" id="dg"></div><div class="dot-l">GYR</div></div>
-      <div class="dot-wrap"><div class="dot-c" id="dm"></div><div class="dot-l">MAG</div></div>
-      <div class="dot-wrap"><div class="dot-c" id="dt"></div><div class="dot-l">TRK</div></div>
-    </div>
-  </div>
-
-  <div id="main">
-    <div id="map-wrap">
-      <canvas id="map-cv"></canvas>
-    </div>
-    <div id="side">
-      <div class="blk"><lbl>POSIZIONE</lbl>
-        <div class="val" id="px">0.00 <small>m X</small></div>
-        <div class="val" id="py">0.00 <small>m Y</small></div>
-        <div class="val o" id="pz">0.00 <small>m Z</small></div>
-      </div>
-      <div class="blk"><lbl>VELOCITA</lbl>
-        <div class="val g" id="spd">0.00 <small>m/s</small></div>
-      </div>
-      <div class="blk"><lbl>VEL X Y Z</lbl>
-        <div class="sm">X:<span id="vx"> 0.00</span><br>Y:<span id="vy"> 0.00</span><br>Z:<span id="vz"> 0.00</span></div>
-      </div>
-      <div class="blk"><lbl>HEADING</lbl>
-        <div class="val" id="hdg">0\u00b0 N</div>
-      </div>
-      <div class="blk"><lbl>BUSSOLA</lbl>
-        <canvas id="cmp-cv" width="128" height="128"></canvas>
-      </div>
-      <div class="blk"><lbl>ASSETTO</lbl>
-        <canvas id="att-cv" width="128" height="128"></canvas>
-      </div>
-      <div class="blk"><lbl>PITCH ROLL</lbl>
-        <div class="sm">P:<span id="pitch"> 0.0\u00b0</span><br>R:<span id="roll"> 0.0\u00b0</span></div>
-      </div>
-      <div class="blk"><lbl>ACCEL RAW</lbl>
-        <div class="sm">X:<span id="arx"> 0.00</span><br>Y:<span id="ary"> 0.00</span><br>Z:<span id="arz"> 0.00</span></div>
-      </div>
-      <div class="blk"><lbl>LOG PUNTI</lbl>
-        <div class="val" id="lpts">0</div>
-      </div>
-    </div>
-  </div>
-
-  <div id="bot">
-    <button class="btn p" id="btn-trk" onclick="toggleTracking()">\u25b6 START</button>
-    <button class="btn d" onclick="resetNav()">\u21ba RESET</button>
-    <button class="btn s" onclick="exportCSV()">\u2193 CSV</button>
-    <button class="btn"   onclick="calibrate()">CAL</button>
-    <span id="lc">0 pts</span>
-  </div>
+<!-- DeviceMotion -->
+<div class="card">
+  <h2><span class="status" id="s-mot"></span>DEVICEMOTION</h2>
+  <div class="row"><span class="lbl">accel.x (gravity)</span><span class="val" id="m-ax">—</span></div>
+  <div class="row"><span class="lbl">accel.y (gravity)</span><span class="val" id="m-ay">—</span></div>
+  <div class="row"><span class="lbl">accel.z (gravity)</span><span class="val" id="m-az">—</span></div>
+  <div class="row"><span class="lbl">linear.x (no grav)</span><span class="val" id="m-lx">—</span></div>
+  <div class="row"><span class="lbl">linear.y (no grav)</span><span class="val" id="m-ly">—</span></div>
+  <div class="row"><span class="lbl">linear.z (no grav)</span><span class="val" id="m-lz">—</span></div>
+  <div class="row"><span class="lbl">rotRate.alpha (°/s)</span><span class="val" id="m-ga">—</span></div>
+  <div class="row"><span class="lbl">rotRate.beta  (°/s)</span><span class="val" id="m-gb">—</span></div>
+  <div class="row"><span class="lbl">rotRate.gamma (°/s)</span><span class="val" id="m-gc">—</span></div>
+  <div class="row"><span class="lbl">interval (ms)</span><span class="val" id="m-int">—</span></div>
+  <p class="note"><b>Atteso piatto/fermo:</b> ax≈0, ay≈0, az≈−9.8 (o +9.8)<br>linear ≈ 0,0,0 — rotRate ≈ 0,0,0</p>
 </div>
 
-<div id="toast"></div>
+<!-- DeviceOrientation -->
+<div class="card">
+  <h2><span class="status" id="s-ori"></span>DEVICEORIENTATION</h2>
+  <div class="row"><span class="lbl">alpha (yaw °)</span><span class="val" id="o-a">—</span></div>
+  <div class="row"><span class="lbl">beta  (pitch °)</span><span class="val" id="o-b">—</span></div>
+  <div class="row"><span class="lbl">gamma (roll °)</span><span class="val" id="o-c">—</span></div>
+  <div class="row"><span class="lbl">absolute</span><span class="val" id="o-abs">—</span></div>
+  <p class="note"><b>Atteso piatto a Nord:</b> alpha≈0 (o 360), beta≈0, gamma≈0<br>
+  Se alpha cambia girando → magnetometro OK<br>
+  Se absolute=false → heading relativo (deriva)</p>
+</div>
+
+<!-- DeviceOrientationAbsolute -->
+<div class="card">
+  <h2><span class="status" id="s-abs"></span>DEVICEORIENTATIONABSOLUTE</h2>
+  <div class="row"><span class="lbl">alpha (yaw °)</span><span class="val" id="a-a">—</span></div>
+  <div class="row"><span class="lbl">beta  (pitch °)</span><span class="val" id="a-b">—</span></div>
+  <div class="row"><span class="lbl">gamma (roll °)</span><span class="val" id="a-c">—</span></div>
+  <p class="note"><b>Atteso puntato a Nord piatto:</b> alpha≈0 (o 360), beta≈0, gamma≈0</p>
+</div>
+
+<!-- Compass calc -->
+<div class="card">
+  <h2>HEADING CALCOLATO</h2>
+  <div class="row"><span class="lbl">da deviceorientation</span><span class="val g" id="h-rel">—</span></div>
+  <div class="row"><span class="lbl">da absolute</span><span class="val g" id="h-abs">—</span></div>
+  <div class="row"><span class="lbl">da absolute (conv2)</span><span class="val w" id="h-abs2">—</span></div>
+  <p class="note">Gira il telefono verso Nord: quale valore si avvicina a <b>0°</b> o <b>360°</b>?</p>
+</div>
+
+<!-- Gravity direction -->
+<div class="card">
+  <h2>DIREZIONE GRAVITA (piatto sul tavolo)</h2>
+  <div class="row"><span class="lbl">asse X dominante?</span><span class="val" id="g-x">—</span></div>
+  <div class="row"><span class="lbl">asse Y dominante?</span><span class="val" id="g-y">—</span></div>
+  <div class="row"><span class="lbl">asse Z dominante?</span><span class="val" id="g-z">—</span></div>
+  <div class="row"><span class="lbl">segno Z</span><span class="val" id="g-sign">—</span></div>
+  <p class="note">Piatto = gravità solo sull'asse Z. <b>Segno Z: −9.8 = schermo su, +9.8 = schermo giù</b></p>
+</div>
+
+<div class="card"><h2>LOG</h2><div id="log"></div></div>
 
 <script>
-// 
+var logEl = document.getElementById('log');
+function log(msg, col) {
+  var d = document.createElement('div');
+  d.style.color = col || '#c8dde8';
+  d.textContent = msg;
+  logEl.appendChild(d);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+var raw = { ax:0,ay:0,az:0, lx:0,ly:0,lz:0, ga:0,gb:0,gc:0, interval:0,
+            oa:0,ob:0,oc:0, oabs:false, aa:0,ab:0,ac:0 };
+
+async function avvia() {
+  document.getElementById('btn').disabled = true;
+  log('Avvio...');
+
+  if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+    try { var r = await DeviceMotionEvent.requestPermission(); log('Motion perm: '+r, r==='granted'?'#39ff14':'#ff6060'); } catch(e){log(''+e,'#ff6060');}
+  }
+  if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+    try { var r2 = await DeviceOrientationEvent.requestPermission(); log('Ori perm: '+r2, r2==='granted'?'#39ff14':'#ff6060'); } catch(e){log(''+e,'#ff6060');}
+  }
+
+  if ('DeviceMotionEvent' in window) {
+    window.addEventListener('devicemotion', function(e) {
+      var a = e.accelerationIncludingGravity;
+      if (a) { raw.ax=a.x||0; raw.ay=a.y||0; raw.az=a.z||0; }
+      var la = e.acceleration;
+      if (la) { raw.lx=la.x||0; raw.ly=la.y||0; raw.lz=la.z||0; }
+      var g = e.rotationRate;
+      if (g) { raw.ga=g.alpha||0; raw.gb=g.beta||0; raw.gc=g.gamma||0; }
+      raw.interval = e.interval||0;
+      document.getElementById('s-mot').className='status ok';
+    }, {passive:true});
+    log('DeviceMotion OK', '#39ff14');
+  } else { log('DeviceMotion non trovato','#ff6060'); }
+
+  window.addEventListener('deviceorientation', function(e) {
+    raw.oa=e.alpha||0; raw.ob=e.beta||0; raw.oc=e.gamma||0; raw.oabs=e.absolute||false;
+    document.getElementById('s-ori').className='status ok';
+  }, {passive:true});
+  log('DeviceOrientation listener OK', '#39ff14');
+
+  if ('ondeviceorientationabsolute' in window) {
+    window.addEventListener('deviceorientationabsolute', function(e) {
+      raw.aa=e.alpha||0; raw.ab=e.beta||0; raw.ac=e.gamma||0;
+      document.getElementById('s-abs').className='status ok';
+    }, {passive:true});
+    log('DeviceOrientationAbsolute listener OK', '#39ff14');
+  } else {
+    log('DeviceOrientationAbsolute non supportato','#ffcc00');
+    document.getElementById('s-abs').className='status warn';
+  }
+
+  setInterval(updateUI, 100);
+  log('Loop avviato', '#39ff14');
+}
+
+function f(n){ return (n>=0?'+':'')+n.toFixed(2); }
+function f1(n){ return (n>=0?'+':'')+n.toFixed(1); }
+
+function updateUI() {
+  // DeviceMotion
+  set('m-ax', f(raw.ax)); set('m-ay', f(raw.ay)); set('m-az', f(raw.az));
+  set('m-lx', f(raw.lx)); set('m-ly', f(raw.ly)); set('m-lz', f(raw.lz));
+  set('m-ga', f1(raw.ga)); set('m-gb', f1(raw.gb)); set('m-gc', f1(raw.gc));
+  set('m-int', raw.interval.toFixed(1)+' ms');
+
+  // DeviceOrientation
+  set('o-a', f1(raw.oa)+'°'); set('o-b', f1(raw.ob)+'°'); set('o-c', f1(raw.oc)+'°');
+  set('o-abs', raw.oabs ? '✓ SI' : '✗ NO');
+
+  // Absolute
+  set('a-a', f1(raw.aa)+'°'); set('a-b', f1(raw.ab)+'°'); set('a-c', f1(raw.ac)+'°');
+
+  // Heading calculations
+  // conv1: alpha diretto
+  var h1 = ((raw.oa % 360) + 360) % 360;
+  // conv2: 360 - alpha
+  var h2 = ((360 - raw.oa) % 360 + 360) % 360;
+  // absolute
+  var ha1 = ((raw.aa % 360) + 360) % 360;
+  var ha2 = ((360 - raw.aa) % 360 + 360) % 360;
+  set('h-rel', h1.toFixed(1)+'°  (360-α='+h2.toFixed(1)+'°)');
+  set('h-abs', ha1.toFixed(1)+'°');
+  set('h-abs2', ha2.toFixed(1)+'°  (360-α)');
+
+  // Gravity
+  var ax=Math.abs(raw.ax), ay=Math.abs(raw.ay), az=Math.abs(raw.az);
+  set('g-x', ax.toFixed(2)+' m/s²  '+(ax>8?'← GRAVITA SU X!':''));
+  set('g-y', ay.toFixed(2)+' m/s²  '+(ay>8?'← GRAVITA SU Y!':''));
+  set('g-z', az.toFixed(2)+' m/s²  '+(az>8?'← GRAVITA SU Z ✓':''));
+  set('g-sign', raw.az < 0 ? raw.az.toFixed(2)+' (schermo verso l\'alto ✓)' : raw.az.toFixed(2)+' (schermo verso il basso)');
+}
+
+function set(id, val) {
+  var el = document.getElementById(id);
+  if (el) el.textContent = val;
+}
+</script>
+</body>
+  </html>
   
