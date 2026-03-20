@@ -8,7 +8,7 @@
 <style>
 /* ── RESET & BASE ── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-html { font-size: 16px; /* Aumentato leggermente per leggibilità */ }
+html { font-size: 16px; }
 body {
   width: 100%; height: 100dvh;
   overflow: hidden;
@@ -202,10 +202,10 @@ body {
           <div class="val" id="s-hdg">0° N</div>
         </div>
         <div class="blk"><span class="lbl">MINI BUSSOLA</span>
-          <canvas id="cmp-sm" width="114" height="114"></canvas>
+          <canvas id="cmp-sm"></canvas>
         </div>
         <div class="blk"><span class="lbl">MINI ASSETTO</span>
-          <canvas id="att-sm" width="114" height="114"></canvas>
+          <canvas id="att-sm"></canvas>
         </div>
         <div class="blk"><span class="lbl">PITCH / ROLL</span>
           <div class="rows">P: <span id="s-pitch">0.0°</span><br>R: <span id="s-roll">0.0°</span></div>
@@ -367,7 +367,6 @@ async function boot() {
 }
 
 function attachSensors() {
-  // DeviceMotion
   if ('DeviceMotionEvent' in window) {
     window.addEventListener('devicemotion', e => {
       const a = e.accelerationIncludingGravity;
@@ -391,7 +390,6 @@ function attachSensors() {
     }, {passive: true});
   }
 
-  // DeviceOrientationAbsolute
   let absAttached = false;
   if ('ondeviceorientationabsolute' in window) {
     window.addEventListener('deviceorientationabsolute', e => {
@@ -405,7 +403,6 @@ function attachSensors() {
     }, {passive: true});
   }
 
-  // DeviceOrientation Fallback
   window.addEventListener('deviceorientation', e => {
     if (absAttached) return;
     if (e.alpha === null || e.alpha === undefined) return;
@@ -423,7 +420,7 @@ function attachSensors() {
 function dotOn(id) { const e = document.getElementById(id); if (e) e.classList.add('on'); }
 
 /* ══════════════════════════════════════════
-   CANVAS SETUP
+   CANVAS SETUP (FIXED SCALING)
 ══════════════════════════════════════════ */
 let mapCv, mapCtx;
 
@@ -437,8 +434,27 @@ function initCanvases() {
     sizeBig('att-big', 'view-att');
     sizeBig('cmp-big', 'view-cmp');
   });
+  
   sizeBig('att-big', 'view-att');
   sizeBig('cmp-big', 'view-cmp');
+  
+  // Setup Mini Canvas with exact Pixel Ratio to center perfectly
+  initMini('cmp-sm');
+  initMini('att-sm');
+}
+
+function initMini(id) {
+  const cv = document.getElementById(id);
+  if (!cv) return;
+  const dpr = window.devicePixelRatio || 1;
+  const s = 100; // dimensione CSS visuale in px
+  cv.style.width = s + 'px';
+  cv.style.height = s + 'px';
+  cv.style.margin = '0 auto';
+  cv.style.display = 'block';
+  cv.width = s * dpr;
+  cv.height = s * dpr;
+  cv.getContext('2d').setTransform(dpr, 0, 0, dpr, 0, 0);
 }
 
 function resizeMap() {
@@ -475,15 +491,14 @@ function loop() {
   const ts = performance.now();
   integrate(ts);
   
-  // PERFORMANCE FIX: Draw ONLY the visible canvases to save battery!
   if (S.currentTab === 'map') {
     drawMap();
-    drawCompass(document.getElementById('cmp-sm'), 57);
-    drawAttitude(document.getElementById('att-sm'), 57);
+    drawCompass(document.getElementById('cmp-sm')); // Niente più raggio fisso, si adatta
+    drawAttitude(document.getElementById('att-sm')); // Niente più raggio fisso, si adatta
   } else if (S.currentTab === 'cmp') {
-    drawCompass(document.getElementById('cmp-big'), null);
+    drawCompass(document.getElementById('cmp-big'));
   } else if (S.currentTab === 'att') {
-    drawAttitude(document.getElementById('att-big'), null);
+    drawAttitude(document.getElementById('att-big'));
   }
 
   updateUI();
@@ -542,13 +557,22 @@ function integrate(ts) {
   const wy = (sy * cp) * lax + (sy * sp * sr + cy * cr) * lay + (sy * sp * cr - cy * sr) * laz;
   const wz = (-sp) * lax     + (cp * sr) * lay                + (cp * cr) * laz;
 
+  // NUOVA LOGICA ZUPT (Zero Velocity Update) AGGRESSIVA
   const am = Math.sqrt(lax * lax + lay * lay + laz * laz);
-  if (am < 0.18) {
+  if (am < 0.25) { // Alzata la sensibilità al movimento
     S.stillCount++;
-    if (S.stillCount > 6) { S.vx *= 0.5; S.vy *= 0.5; S.vz *= 0.5; }
-  } else { S.stillCount = 0; }
+    if (S.stillCount > 4) { // Reagisce prima
+      // Frena e annulla le micro-derive
+      S.vx *= 0.1; S.vy *= 0.1; S.vz *= 0.1;
+      if (Math.abs(S.vx) < 0.02) S.vx = 0;
+      if (Math.abs(S.vy) < 0.02) S.vy = 0;
+      if (Math.abs(S.vz) < 0.02) S.vz = 0;
+    }
+  } else { 
+    S.stillCount = 0; 
+  }
 
-  const thr = 0.08;
+  const thr = 0.15; // Deadband alzato per ignorare piccoli tremolii
   S.vx += (Math.abs(wx) > thr ? wx : 0) * dt;
   S.vy += (Math.abs(wy) > thr ? wy : 0) * dt;
   S.vz += (Math.abs(wz) > thr ? wz : 0) * dt;
@@ -650,11 +674,11 @@ function drawMap() {
   ctx.fillStyle = '#b8cdd8'; ctx.fillText(S.pz.toFixed(1), W - 21, bY + bH + 12);
 }
 
-function drawCompass(cv, fixedR) {
+function drawCompass(cv) {
   if (!cv) return;
   const dpr = window.devicePixelRatio || 1;
   const W = cv.width / dpr, H = cv.height / dpr, ctx = cv.getContext('2d');
-  const cx = W / 2, cy = H / 2, r = fixedR || Math.min(cx, cy) - 3;
+  const cx = W / 2, cy = H / 2, r = Math.min(cx, cy) - 3; // Auto-adatta il raggio
 
   ctx.clearRect(0, 0, cv.width, cv.height);
 
@@ -700,11 +724,11 @@ function drawCompass(cv, fixedR) {
   ctx.fillText(yd2.toFixed(0) + '°', cx, cy);
 }
 
-function drawAttitude(cv, fixedR) {
+function drawAttitude(cv) {
   if (!cv) return;
   const dpr = window.devicePixelRatio || 1;
   const W = cv.width / dpr, H = cv.height / dpr, ctx = cv.getContext('2d');
-  const cx = W / 2, cy = H / 2, r = fixedR || Math.min(cx, cy) - 3;
+  const cx = W / 2, cy = H / 2, r = Math.min(cx, cy) - 3; // Auto-adatta il raggio
 
   ctx.clearRect(0, 0, cv.width, cv.height);
 
