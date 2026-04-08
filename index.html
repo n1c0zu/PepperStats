@@ -127,7 +127,7 @@
   .btn-loc:hover { color: var(--green); border-color: rgba(109,186,144,0.3); }
 
   /* MAIN CONTENT */
-  .main { max-width: 900px; margin: 0 auto; padding: 32px 23px 60px; }
+  .main { max-width: 1160px; margin: 0 auto; padding: 32px 32px 70px; }
 
   /* LOADING */
   .loading-overlay {
@@ -1024,328 +1024,306 @@ function renderAgronomy(c, h, d, hi, et0, uv, soilT, hum) {
   const container = document.getElementById('agroGrid');
   container.innerHTML = '';
 
-  // --- PIANO FERTILIZZAZIONE ---
-  // Logica: l'assorbimento nutritivo dipende da T suolo, ET0 (attività radicale) e umidità
-  // Sotto 15°C suolo: radici assorbono poco, concimazione sprecata
-  // ET0 alta = pianta attiva = alta domanda nutritiva
-  // Umidità >85% = rischio dilavamento azoto + blocco Ca/Mg
-  const tAvg7 = d.temperature_2m_max.slice(0,7).reduce((a,b,i)=>a+(b+d.temperature_2m_min[i])/2,0)/7;
-  const rain7f = d.precipitation_sum.slice(0,7).reduce((a,b)=>a+b,0);
+  // ── TOKEN DI STILE COMUNI ──────────────────────────────────────────
+  // Ogni widget usa questi helper per essere visivamente coerente
+  const S = {
+    // titolo sezione interna alla card
+    sectionLabel: 'font-size:13px;font-weight:600;color:var(--text2);margin-bottom:4px;',
+    // testo descrittivo principale
+    body:  'font-size:15px;color:var(--text);line-height:1.6;',
+    // testo secondario / note
+    note:  'font-size:13px;color:var(--text2);line-height:1.5;',
+    // footer con dati grezzi
+    foot:  'font-size:12px;color:var(--text2);border-top:1px solid rgba(255,255,255,0.07);padding-top:10px;margin-top:12px;',
+    // valore numerico grande
+    big:   'font-size:26px;font-weight:700;',
+    // badge status
+    badge: (col) => `display:inline-block;padding:3px 10px;border-radius:6px;font-size:13px;font-weight:600;background:${col}22;color:${col};border:1px solid ${col}44;`,
+    // barra orizzontale
+    barTrack: 'height:8px;background:rgba(255,255,255,0.07);border-radius:4px;overflow:hidden;margin:6px 0;',
+    barFill:  (w, col) => `height:100%;width:${w}%;background:${col};border-radius:4px;transition:width 0.6s;`,
+    // riga di consiglio con bordo laterale colorato
+    advice: (col) => `font-size:14px;color:var(--text);line-height:1.5;padding:8px 10px 8px 14px;border-left:2px solid ${col};background:${col}0d;border-radius:0 6px 6px 0;`,
+  };
 
-  // Assorbimento radicale (0-100)
-  const rootAbsorption = soilT < 12 ? 20 : soilT < 15 ? 45 : soilT < 28 ? 90 : soilT < 33 ? 70 : 35;
-  // Domanda nutritiva
-  const nutrientDemand = et0 > 5 ? 'alta' : et0 > 2.5 ? 'media' : 'bassa';
+  // helper: riga label + valore su riga singola
+  const row = (label, value, valColor='var(--text)') =>
+    `<div style="display:flex;justify-content:space-between;align-items:baseline;padding:9px 0;border-bottom:1px solid rgba(255,255,255,0.05);">
+       <span style="font-size:14px;color:var(--text2);">${label}</span>
+       <span style="font-size:14px;font-weight:600;color:${valColor};">${value}</span>
+     </div>`;
 
-  // Tipo concime consigliato in base a condizioni
+  const tAvg7   = d.temperature_2m_max.slice(0,7).reduce((a,b,i)=>a+(b+d.temperature_2m_min[i])/2,0)/7;
+  const rain7f  = d.precipitation_sum.slice(0,7).reduce((a,b)=>a+b,0);
+  const tRange7 = d.temperature_2m_max.slice(0,7).reduce((a,b,i)=>a+(b-d.temperature_2m_min[i]),0)/7;
+  const tMed    = (d.temperature_2m_max[0]+d.temperature_2m_min[0])/2;
+  const rainExcess = rain7f > 40;
+  const tempNow = h.temperature_2m[hi];
+
+  // ─────────────────────────────────────────────────────────────────────
+  // 1. FERTILIZZAZIONE
+  // ─────────────────────────────────────────────────────────────────────
+  const rootAbs  = soilT < 12 ? 20 : soilT < 15 ? 45 : soilT < 28 ? 90 : soilT < 33 ? 70 : 35;
+  const absColor = rootAbs > 70 ? 'var(--green)' : rootAbs > 40 ? 'var(--yellow)' : 'var(--red)';
+  const demandLbl = et0 > 5 ? 'Alta' : et0 > 2.5 ? 'Media' : 'Bassa';
+  const demandCol = et0 > 5 ? 'var(--orange)' : et0 > 2.5 ? 'var(--yellow)' : 'var(--green)';
+
   let fertType, fertNote, fertColor, fertFreq;
   if (soilT < 12) {
-    fertType = 'Sospendere';
-    fertNote = 'Suolo troppo freddo ('+soilT+'°C): radici inattive, il concime rimane inutilizzato nel substrato e rischia di accumularsi come sale.';
-    fertColor = 'var(--blue)'; fertFreq = '—';
+    fertType='Sospendere'; fertColor='var(--blue)'; fertFreq='—';
+    fertNote=`Suolo freddo (${soilT}°C): le radici sono inattive. Il concime non viene assorbito e si accumula come sale.`;
   } else if (hum > 85 && rain7f > 30) {
-    fertType = 'Solo Ca/Mg fogliari';
-    fertNote = 'Piogge abbondanti ('+rain7f.toFixed(0)+'mm/7gg) dilavano azoto e potassio. Evita concimi idrosolubili al suolo. Utile uno spray fogliare di calcio e magnesio per prevenire marciumi apicali.';
-    fertColor = 'var(--blue)'; fertFreq = 'Una volta a settimana fogliare';
+    fertType='Solo Ca/Mg fogliari'; fertColor='var(--blue)'; fertFreq='1× a settimana, fogliare';
+    fertNote=`Piogge abbondanti (${rain7f.toFixed(0)} mm/7gg) dilavano N e K. Spray fogliare di calcio e magnesio per prevenire marciumi apicali.`;
   } else if (tAvg7 > 28 && et0 > 5) {
-    fertType = 'K+ e microelementi';
-    fertNote = 'Caldo intenso con alta evapotraspirazione: la pianta è in stress idrico e consuma potassio per regolare gli stomi. Priorità a concimi con K alto (es. 5-10-30). Aggiungere boro per supportare la fioritura.';
-    fertColor = 'var(--orange)'; fertFreq = 'Ogni 5–7 giorni';
+    fertType='K⁺ e microelementi'; fertColor='var(--orange)'; fertFreq='Ogni 5–7 giorni';
+    fertNote=`Stress idrico in corso: la pianta esaurisce il potassio per regolare gli stomi. Usa concimi ad alto K (es. 5-10-30) e aggiungi boro per la fioritura.`;
   } else if (tAvg7 >= 18 && et0 >= 2.5) {
-    fertType = 'NPK bilanciato (fase attiva)';
-    fertNote = 'Condizioni ideali per l\'assorbimento radicale. Usa un concime completo NPK (es. 7-7-7 o 6-12-36 in fioritura). Integra calcio se hai avuto marciumi apicali in passato.';
-    fertColor = 'var(--green)'; fertFreq = 'Ogni 7–10 giorni';
+    fertType='NPK bilanciato'; fertColor='var(--green)'; fertFreq='Ogni 7–10 giorni';
+    fertNote=`Condizioni ideali per l'assorbimento. Usa un NPK completo (7-7-7 o 6-12-36 in fioritura). Integra calcio se ci sono stati marciumi apicali.`;
   } else {
-    fertType = 'N leggero (fase lenta)';
-    fertNote = 'Temperature miti con bassa evapotraspirazione: crescita rallentata. Usa una dose ridotta di azoto organico (es. guano diluito) per sostenere il fogliame senza forzare.';
-    fertColor = 'var(--text2)'; fertFreq = 'Ogni 12–15 giorni';
+    fertType='N organico leggero'; fertColor='var(--text2)'; fertFreq='Ogni 12–15 giorni';
+    fertNote=`Crescita rallentata. Dose ridotta di azoto organico (es. guano diluito) per sostenere il fogliame senza forzare.`;
   }
-
-  const absBar = rootAbsorption;
-  const absColor = rootAbsorption > 70 ? 'var(--green)' : rootAbsorption > 40 ? 'var(--yellow)' : 'var(--red)';
 
   container.innerHTML += `
     <div class="agro-card">
       <div class="agro-card-title"><div class="agro-icon green">🧪</div>Piano Fertilizzazione</div>
-      <div style="margin-bottom:10px;">
-        <div style="font-size:11px;color:var(--text3);margin-bottom:3px;">Assorbimento radicale stimato</div>
-        <div style="position:relative;height:8px;background:rgba(255,255,255,0.08);border-radius:4px;margin-bottom:4px;">
-          <div style="height:100%;width:${absBar}%;background:${absColor};border-radius:4px;transition:width 0.5s;"></div>
+      <div style="margin-bottom:14px;">
+        <div style="${S.sectionLabel}">Assorbimento radicale stimato</div>
+        <div style="${S.barTrack}"><div style="${S.barFill(rootAbs,absColor)}"></div></div>
+        <div style="display:flex;justify-content:space-between;${S.note}">
+          <span>T suolo: ${soilT}°C</span><span>Domanda: <span style="color:${demandCol};font-weight:600;">${demandLbl}</span></span>
         </div>
-        <div style="font-size:10px;color:var(--text3);">T suolo ${soilT}°C · Domanda nutritiva: ${nutrientDemand}</div>
       </div>
-      <div style="margin-bottom:8px;">
-        <div style="font-size:13px;font-weight:700;color:${fertColor};margin-bottom:4px;">${fertType}</div>
-        <div style="font-size:11px;color:var(--text3);margin-bottom:6px;">Frequenza: ${fertFreq}</div>
-        <div style="font-size:12px;color:var(--text2);line-height:1.5;">${fertNote}</div>
+      <div style="margin-bottom:12px;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+          <span style="${S.badge(fertColor)}">${fertType}</span>
+          <span style="${S.note}">${fertFreq}</span>
+        </div>
+        <div style="${S.note}">${fertNote}</div>
       </div>
-      <div style="font-size:10px;color:var(--text3);border-top:1px solid rgba(255,255,255,0.07);padding-top:6px;margin-top:2px;">Basato su: T suolo ${soilT}°C · ET₀ ${et0}mm · Umidità ${hum}% · Pioggia 7gg ${rain7f.toFixed(0)}mm</div>
+      <div style="${S.foot}">ET₀ ${et0} mm · Umidità ${hum}% · Pioggia 7gg ${rain7f.toFixed(0)} mm</div>
     </div>`;
 
-  // --- INDICE QUALITÀ FRUTTO ---
-  // Capsaicina aumenta con: stress idrico moderato, UV alti, escursione termica alta, T >25°C
-  // Colore/maturazione: escursione >12°C accelera viraggio, UV>6 intensifica colore
-  // Zuccheri: T media 22-28°C ottimale, si riducono con piogge eccessive
-  const tRange7avg = d.temperature_2m_max.slice(0,7).reduce((a,b,i)=>a+(b-d.temperature_2m_min[i]),0)/7;
-  const tMed = (d.temperature_2m_max[0] + d.temperature_2m_min[0]) / 2;
-  const rainExcess = rain7f > 40;
+  // ─────────────────────────────────────────────────────────────────────
+  // 2. QUALITÀ FRUTTO
+  // ─────────────────────────────────────────────────────────────────────
+  const capsScore  = Math.min(100,Math.max(0,
+    (uv>=6?25:uv>=3?12:0)+(tRange7>=12?25:tRange7>=8?15:5)+(tMed>=25&&tMed<=32?30:tMed>=20?18:5)+(et0>4&&!rainExcess?20:et0>2?10:0)));
+  const colorScore = Math.min(100,Math.max(0,
+    (uv>=7?35:uv>=4?20:8)+(tRange7>=10?30:tRange7>=6?18:6)+(tMed>=22&&tMed<=30?25:tMed>=18?12:3)+(!rainExcess?10:0)));
+  const sugarScore = Math.min(100,Math.max(0,
+    (tMed>=22&&tMed<=28?40:tMed>=18?20:8)+(uv>=5?25:uv>=3?14:5)+(!rainExcess?20:5)+(hum<75?15:hum<85?8:0)));
 
-  // Score capsaicina (piccantezza) 0-100
-  const capsScore = Math.min(100, Math.max(0,
-    (uv >= 6 ? 25 : uv >= 3 ? 12 : 0) +
-    (tRange7avg >= 12 ? 25 : tRange7avg >= 8 ? 15 : 5) +
-    (tMed >= 25 && tMed <= 32 ? 30 : tMed >= 20 ? 18 : 5) +
-    (et0 > 4 && !rainExcess ? 20 : et0 > 2 ? 10 : 0)
-  ));
-
-  // Score colore/maturazione 0-100
-  const colorScore = Math.min(100, Math.max(0,
-    (uv >= 7 ? 35 : uv >= 4 ? 20 : 8) +
-    (tRange7avg >= 10 ? 30 : tRange7avg >= 6 ? 18 : 6) +
-    (tMed >= 22 && tMed <= 30 ? 25 : tMed >= 18 ? 12 : 3) +
-    (!rainExcess ? 10 : 0)
-  ));
-
-  // Score dolcezza/zuccheri 0-100
-  const sugarScore = Math.min(100, Math.max(0,
-    (tMed >= 22 && tMed <= 28 ? 40 : tMed >= 18 ? 20 : 8) +
-    (uv >= 5 ? 25 : uv >= 3 ? 14 : 5) +
-    (!rainExcess ? 20 : 5) +
-    (hum < 75 ? 15 : hum < 85 ? 8 : 0)
-  ));
-
-  const scoreBar = (val, color) => `
-    <div style="position:relative;height:7px;background:rgba(255,255,255,0.08);border-radius:4px;">
-      <div style="height:100%;width:${val}%;background:${color};border-radius:4px;transition:width 0.5s;"></div>
+  const scoreRow = (icon, label, val, col, note) => `
+    <div style="margin-bottom:12px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+        <span style="font-size:14px;color:var(--text2);">${icon} ${label}</span>
+        <span style="${S.badge(col)}">${val}/100</span>
+      </div>
+      <div style="${S.barTrack}"><div style="${S.barFill(val,col)}"></div></div>
+      <div style="${S.note};margin-top:4px;">${note}</div>
     </div>`;
-
-  const capsNote = capsScore > 70 ? 'Condizioni favorevoli alla sintesi di capsaicina' : capsScore > 40 ? 'Piccantezza nella media' : 'Stress ridotto — frutto tendenzialmente dolce';
-  const colorNote = colorScore > 70 ? 'Viraggio rapido e colore intenso previsto' : colorScore > 40 ? 'Maturazione regolare' : 'Maturazione lenta — scarsità di luce o T basse';
-  const sugarNote = sugarScore > 70 ? 'Alta concentrazione zuccherina (sapore pieno)' : sugarScore > 40 ? 'Dolcezza nella norma' : 'Piogge o T anomale possono diluire gli zuccheri';
 
   container.innerHTML += `
     <div class="agro-card">
-      <div class="agro-card-title"><div class="agro-icon red">🌶️</div>Indice Qualità Frutto</div>
-      <div style="display:flex;flex-direction:column;gap:11px;">
-        <div>
-          <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
-            <span style="font-size:12px;color:var(--text2);">🔥 Piccantezza (capsaicina)</span>
-            <span style="font-size:12px;font-weight:700;color:var(--orange)">${capsScore}/100</span>
-          </div>
-          ${scoreBar(capsScore,'var(--orange)')}
-          <div style="font-size:10px;color:var(--text3);margin-top:3px;">${capsNote}</div>
-        </div>
-        <div>
-          <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
-            <span style="font-size:12px;color:var(--text2);">🎨 Colore e maturazione</span>
-            <span style="font-size:12px;font-weight:700;color:var(--red)">${colorScore}/100</span>
-          </div>
-          ${scoreBar(colorScore,'var(--red)')}
-          <div style="font-size:10px;color:var(--text3);margin-top:3px;">${colorNote}</div>
-        </div>
-        <div>
-          <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
-            <span style="font-size:12px;color:var(--text2);">🍬 Dolcezza (zuccheri)</span>
-            <span style="font-size:12px;font-weight:700;color:var(--yellow)">${sugarScore}/100</span>
-          </div>
-          ${scoreBar(sugarScore,'var(--yellow)')}
-          <div style="font-size:10px;color:var(--text3);margin-top:3px;">${sugarNote}</div>
-        </div>
-      </div>
-      <div style="font-size:10px;color:var(--text3);border-top:1px solid rgba(255,255,255,0.07);padding-top:7px;margin-top:10px;">Basato su: UV ${uv} · Escursione media 7gg ${tRange7avg.toFixed(1)}°C · T media ${tMed.toFixed(1)}°C · Pioggia ${rain7f.toFixed(0)}mm</div>
+      <div class="agro-card-title"><div class="agro-icon red">🌶️</div>Qualità Frutto</div>
+      ${scoreRow('🔥','Piccantezza',capsScore,'var(--orange)',
+        capsScore>70?'Sintesi di capsaicina favorita dalle condizioni attuali.':capsScore>40?'Piccantezza nella media.':'Stress ridotto — frutto tendenzialmente dolce.')}
+      ${scoreRow('🎨','Colore e maturazione',colorScore,'var(--red)',
+        colorScore>70?'Viraggio rapido e colore intenso previsto.':colorScore>40?'Maturazione regolare.':'Luce o temperature insufficienti per un viraggio veloce.')}
+      ${scoreRow('🍬','Dolcezza',sugarScore,'var(--yellow)',
+        sugarScore>70?'Alta concentrazione zuccherina prevista.':sugarScore>40?'Dolcezza nella norma.':'Piogge o T anomale possono diluire gli zuccheri.')}
+      <div style="${S.foot}">UV ${uv} · Escursione 7gg ${tRange7.toFixed(1)}°C · T media ${tMed.toFixed(1)}°C</div>
     </div>`;
 
-  // --- Rischio Patogeni ---
-  let pathRisk = 'ok', pathTitle = 'Basso', pathDesc = 'Condizioni sfavorevoli per fungosi e batteriosi.';
-  const dewNow = h.dewpoint_2m ? h.dewpoint_2m[hi] : null;
-  const tempNow = h.temperature_2m[hi];
+  // ─────────────────────────────────────────────────────────────────────
+  // 3. RISCHIO FITOPATOLOGICO
+  // ─────────────────────────────────────────────────────────────────────
+  const dewNow  = h.dewpoint_2m ? h.dewpoint_2m[hi] : null;
   const leafWet = hum > 85 && tempNow > 15 && tempNow < 28;
+  let pathRisk='ok', pathTitle='Basso', pathDesc='Condizioni sfavorevoli per fungosi e batteriosi.', pathCol='var(--green)';
   if (leafWet) {
-    pathRisk = 'danger'; pathTitle = 'ALTO — Bagnatura fogliare';
-    pathDesc = `Umidità ${hum}% + T ${tempNow}°C: condizioni ideali per Botrytis e Phytophthora. Trattamento preventivo consigliato.`;
-  } else if (hum > 75 || (tempNow > 20 && hum > 65)) {
-    pathRisk = 'warn'; pathTitle = 'Moderato';
-    pathDesc = `Umidità elevata (${hum}%). Monitorare oidio e alternaria. Assicurare ventilazione.`;
+    pathRisk='danger'; pathTitle='Alto — bagnatura fogliare'; pathCol='var(--red)';
+    pathDesc=`Umidità ${hum}% + T ${tempNow}°C: condizioni ideali per Botrytis e Phytophthora. Trattamento preventivo consigliato.`;
+  } else if (hum>75 || (tempNow>20&&hum>65)) {
+    pathRisk='warn'; pathTitle='Moderato'; pathCol='var(--yellow)';
+    pathDesc=`Umidità elevata (${hum}%). Monitorare oidio e alternaria. Assicurare buona ventilazione tra le piante.`;
   }
 
   container.innerHTML += `
     <div class="agro-card">
       <div class="agro-card-title"><div class="agro-icon red">🔬</div>Rischio Fitopatologico</div>
-      <div class="risk-indicator">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
         <div class="risk-dot ${pathRisk}"></div>
-        <div class="risk-label">${pathTitle}</div>
+        <span style="${S.badge(pathCol)}">${pathTitle}</span>
       </div>
-      <div class="risk-desc">${pathDesc}</div>
-      ${dewNow !== null ? `<div style="font-size:11px; color:var(--text3); margin-top:8px;">Punto di rugiada: ${dewNow.toFixed(1)}°C</div>` : ''}
+      <div style="${S.body}">${pathDesc}</div>
+      ${dewNow!==null?`<div style="${S.note};margin-top:10px;">Punto di rugiada: ${dewNow.toFixed(1)}°C</div>`:''}
+      <div style="${S.foot}">Umidità: ${hum}% · T aria: ${tempNow}°C</div>
     </div>`;
 
-  // --- Stress Termico ---
-  // Scala calore: 15°C (ottimale inizio) → 45°C (letale). Marker soglia a 32°C
-  const tMax7 = Math.max(...d.temperature_2m_max.slice(0, 7));
-  const tMin7 = Math.min(...d.temperature_2m_min.slice(0, 7));
-  const HEAT_MIN = 15, HEAT_MAX = 45, HEAT_THRESH = 32;
-  const COLD_MIN = -5, COLD_MAX = 15, COLD_THRESH = 8;
-  const heatPct  = Math.min(100, Math.max(0, (tMax7 - HEAT_MIN) / (HEAT_MAX - HEAT_MIN) * 100));
-  const coldPct  = Math.min(100, Math.max(0, (COLD_MAX - tMin7) / (COLD_MAX - COLD_MIN) * 100));
-  const threshHeatPct = (HEAT_THRESH - HEAT_MIN) / (HEAT_MAX - HEAT_MIN) * 100;
-  const threshColdPct = (COLD_MAX - COLD_THRESH) / (COLD_MAX - COLD_MIN) * 100;
-  const heatColor = tMax7 >= HEAT_THRESH ? (tMax7 >= 40 ? 'var(--red)' : 'var(--yellow)') : 'var(--green)';
-  const coldColor = tMin7 <= COLD_THRESH ? (tMin7 <= 0 ? 'var(--red)' : 'var(--yellow)') : 'var(--green)';
-  const heatStatus = tMax7 >= 40 ? 'Critico' : tMax7 >= HEAT_THRESH ? 'Attenzione' : 'Ottimale';
-  const coldStatus = tMin7 <= 0 ? 'Gelata' : tMin7 <= COLD_THRESH ? 'Attenzione' : 'Sicuro';
+  // ─────────────────────────────────────────────────────────────────────
+  // 4. STRESS TERMICO
+  // ─────────────────────────────────────────────────────────────────────
+  const tMax7=Math.max(...d.temperature_2m_max.slice(0,7));
+  const tMin7=Math.min(...d.temperature_2m_min.slice(0,7));
+  const HEAT_MIN=15,HEAT_MAX=45,HEAT_THRESH=32;
+  const COLD_MIN=-5,COLD_MAX=15,COLD_THRESH=8;
+  const heatPct=Math.min(100,Math.max(0,(tMax7-HEAT_MIN)/(HEAT_MAX-HEAT_MIN)*100));
+  const coldPct=Math.min(100,Math.max(0,(COLD_MAX-tMin7)/(COLD_MAX-COLD_MIN)*100));
+  const thHP=((HEAT_THRESH-HEAT_MIN)/(HEAT_MAX-HEAT_MIN)*100).toFixed(1);
+  const thCP=((COLD_MAX-COLD_THRESH)/(COLD_MAX-COLD_MIN)*100).toFixed(1);
+  const heatCol=tMax7>=HEAT_THRESH?(tMax7>=40?'var(--red)':'var(--yellow)'):'var(--green)';
+  const coldCol=tMin7<=COLD_THRESH?(tMin7<=0?'var(--red)':'var(--yellow)'):'var(--green)';
+  const heatStatus=tMax7>=40?'Critico':tMax7>=HEAT_THRESH?'Attenzione':'Ottimale';
+  const coldStatus=tMin7<=0?'Gelata':tMin7<=COLD_THRESH?'Attenzione':'Sicuro';
+
+  const thermBar = (pct, col, thresh, labL, labM, labR) => `
+    <div style="position:relative;height:10px;background:rgba(255,255,255,0.07);border-radius:5px;overflow:visible;margin:6px 0;">
+      <div style="position:absolute;top:0;left:0;height:100%;width:${pct.toFixed(1)}%;background:${col};border-radius:5px;transition:width 0.6s;"></div>
+      <div style="position:absolute;top:-4px;left:${thresh}%;width:2px;height:18px;background:rgba(255,255,255,0.45);border-radius:1px;"></div>
+    </div>
+    <div style="display:flex;justify-content:space-between;${S.note}margin-top:2px;"><span>${labL}</span><span>${labM}</span><span>${labR}</span></div>`;
 
   container.innerHTML += `
     <div class="agro-card">
       <div class="agro-card-title"><div class="agro-icon orange">🌡️</div>Stress Termico (7gg)</div>
-      <div style="margin-bottom:14px;">
-        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;">
-          <div style="font-size:11px;color:var(--text3);">Stress da calore</div>
-          <div style="font-size:13px;font-weight:700;color:${heatColor}">${tMax7}°C — ${heatStatus}</div>
+      <div style="margin-bottom:16px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;">
+          <span style="${S.sectionLabel}margin-bottom:0;">Calore</span>
+          <span style="${S.badge(heatCol)}">${tMax7}°C — ${heatStatus}</span>
         </div>
-        <div style="position:relative;height:10px;background:rgba(255,255,255,0.08);border-radius:5px;overflow:visible;">
-          <div style="position:absolute;top:0;left:0;height:100%;width:${heatPct.toFixed(1)}%;background:${heatColor};border-radius:5px;transition:width 0.5s;"></div>
-          <div style="position:absolute;top:-3px;left:${threshHeatPct.toFixed(1)}%;width:2px;height:16px;background:rgba(255,255,255,0.5);border-radius:1px;" title="Soglia stress 32°C"></div>
-        </div>
-        <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text3);margin-top:5px;"><span>15°C ottimale</span><span>⚠ 32°C soglia</span><span>45°C letale</span></div>
+        ${thermBar(heatPct,heatCol,thHP,'15°C','⚠ 32°C','45°C')}
       </div>
       <div>
-        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;">
-          <div style="font-size:11px;color:var(--text3);">Stress da freddo</div>
-          <div style="font-size:13px;font-weight:700;color:${coldColor}">${tMin7}°C — ${coldStatus}</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;">
+          <span style="${S.sectionLabel}margin-bottom:0;">Freddo</span>
+          <span style="${S.badge(coldCol)}">${tMin7}°C — ${coldStatus}</span>
         </div>
-        <div style="position:relative;height:10px;background:rgba(255,255,255,0.08);border-radius:5px;overflow:visible;">
-          <div style="position:absolute;top:0;left:0;height:100%;width:${coldPct.toFixed(1)}%;background:${coldColor};border-radius:5px;transition:width 0.5s;"></div>
-          <div style="position:absolute;top:-3px;left:${threshColdPct.toFixed(1)}%;width:2px;height:16px;background:rgba(255,255,255,0.5);border-radius:1px;" title="Soglia freddo 8°C"></div>
-        </div>
-        <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text3);margin-top:5px;"><span>15°C sicuro</span><span>⚠ 8°C soglia</span><span>-5°C gelata</span></div>
+        ${thermBar(coldPct,coldCol,thCP,'15°C','⚠ 8°C','-5°C')}
       </div>
-      <div style="font-size:10px;color:var(--text3);margin-top:10px;border-top:1px solid rgba(255,255,255,0.07);padding-top:8px;">La barra indica la posizione della temperatura rilevata sulla scala di rischio. La linea bianca è la soglia critica per il peperone.</div>
+      <div style="${S.foot}">La linea bianca indica la soglia critica per il peperone.</div>
     </div>`;
 
-  // --- Irrigazione Avanzata ---
-  const rain7 = d.precipitation_sum.slice(0, 7).reduce((a, b) => a + b, 0);
-  const netWater = Math.max(0, et0 - d.precipitation_sum[0]);
-  let irrLabel, irrColor;
-  if (et0 > 6) { irrLabel = 'Irrigazione quotidiana'; irrColor = 'var(--orange)'; }
-  else if (et0 > 3.5) { irrLabel = 'Ogni 2 giorni'; irrColor = 'var(--yellow)'; }
-  else if (et0 > 1.5) { irrLabel = 'Ogni 3-4 giorni'; irrColor = 'var(--green)'; }
-  else { irrLabel = 'Sospendere'; irrColor = 'var(--blue)'; }
+  // ─────────────────────────────────────────────────────────────────────
+  // 5. PIANO IRRIGAZIONE
+  // ─────────────────────────────────────────────────────────────────────
+  const rain7=d.precipitation_sum.slice(0,7).reduce((a,b)=>a+b,0);
+  const netWater=Math.max(0,et0-d.precipitation_sum[0]);
+  let irrLabel,irrColor;
+  if(et0>6){irrLabel='Quotidiana';irrColor='var(--orange)';}
+  else if(et0>3.5){irrLabel='Ogni 2 giorni';irrColor='var(--yellow)';}
+  else if(et0>1.5){irrLabel='Ogni 3–4 giorni';irrColor='var(--green)';}
+  else{irrLabel='Sospendere';irrColor='var(--blue)';}
 
   container.innerHTML += `
     <div class="agro-card">
       <div class="agro-card-title"><div class="agro-icon blue">💧</div>Piano Irrigazione</div>
-      <table class="irr-table">
-        <tr><td>Frequenza consigliata</td><td style="color:${irrColor}">${irrLabel}</td></tr>
-        <tr><td>ET₀ oggi</td><td>${et0} mm</td></tr>
-        <tr><td>Pioggia oggi</td><td>${d.precipitation_sum[0]} mm</td></tr>
-        <tr><td>Fabbisogno netto</td><td>${netWater.toFixed(1)} mm</td></tr>
-        <tr><td>Pioggia 7 giorni</td><td>${rain7.toFixed(1)} mm</td></tr>
-      </table>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+        <span style="${S.badge(irrColor)}">${irrLabel}</span>
+      </div>
+      ${row('ET₀ oggi',et0+' mm','var(--text)')}
+      ${row('Pioggia oggi',d.precipitation_sum[0]+' mm','var(--blue)')}
+      ${row('Fabbisogno netto',netWater.toFixed(1)+' mm',irrColor)}
+      ${row('Pioggia 7 giorni',rain7.toFixed(1)+' mm','var(--text)')}
+      <div style="${S.foot}">Valori basati su ET₀ FAO-56</div>
     </div>`;
 
-  // --- Finestre Operative ---
-  const coldWindows = getTemperatureWindows(h, hi, 24);
-  let moveHTML = '';
-  if (coldWindows.freeze.length) {
-    moveHTML = `<div style="color:var(--red);font-size:12px;font-weight:600;margin-bottom:6px;">⚠ Gelate previste — piante al riparo!</div>`;
-    coldWindows.freeze.forEach(w => moveHTML += `<div style="font-size:12px;color:var(--text2)">❄ ${w.start}–${w.end}: T &lt; 0°C → danno irreversibile</div>`);
-  } else if (coldWindows.cold.length) {
-    moveHTML = `<div style="font-size:12px;color:var(--text2);margin-bottom:4px;">Fasce critiche (T &lt; 8°C):</div>`;
-    coldWindows.cold.forEach(w => moveHTML += `<div style="font-size:12px;color:var(--blue)">🌡 ${w.start}–${w.end}: rientrare le piante</div>`);
-    moveHTML += `<div style="font-size:11px;color:var(--text3);margin-top:6px;">All'esterno negli altri orari ✓</div>`;
-  } else {
-    moveHTML = `<div style="color:var(--green);font-size:13px;font-weight:600;">✓ Sicuro per 24h</div><div style="font-size:12px;color:var(--text3);margin-top:4px;">Nessuna soglia critica prevista.</div>`;
+  // ─────────────────────────────────────────────────────────────────────
+  // 6. GESTIONE SPOSTAMENTI
+  // ─────────────────────────────────────────────────────────────────────
+  const coldWin=getTemperatureWindows(h,hi,24);
+  let moveItems=[];
+  if(coldWin.freeze.length){
+    moveItems.push({col:'var(--red)',txt:`Gelate previste: ${coldWin.freeze.map(w=>w.start+'–'+w.end).join(', ')}. Portare immediatamente le piante al riparo.`});
+  }
+  if(coldWin.cold.length){
+    moveItems.push({col:'var(--blue)',txt:`Freddo critico (<8°C): ${coldWin.cold.map(w=>w.start+'–'+w.end).join(', ')}. Rientrare le piante in questi orari.`});
+  }
+  if(!coldWin.freeze.length&&!coldWin.cold.length){
+    moveItems.push({col:'var(--green)',txt:'Nessuna soglia critica prevista nelle prossime 24 ore. Le piante possono restare all\'esterno.'});
   }
 
   container.innerHTML += `
     <div class="agro-card">
       <div class="agro-card-title"><div class="agro-icon yellow">🚚</div>Gestione Spostamenti</div>
-      ${moveHTML}
+      <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:4px;">
+        ${moveItems.map(a=>`<div style="${S.advice(a.col)}">${a.txt}</div>`).join('')}
+      </div>
+      <div style="${S.foot}">Soglie: freddo &lt;8°C · gelata &lt;0°C</div>
     </div>`;
 
-  // --- Analisi Vento 7 Giorni ---
-  const wind7max = d.windspeed_10m_max; // array 7 giorni
-  const windMax7 = Math.max(...wind7max);
-  const windAvg7 = wind7max.reduce((a,b)=>a+b,0) / wind7max.length;
-  const windMax24 = Math.max(...h.wind_speed_10m.slice(hi, hi+24));
-  const windDir24 = c.wind_direction_10m;
+  // ─────────────────────────────────────────────────────────────────────
+  // 7. VENTO 7 GIORNI (larga)
+  // ─────────────────────────────────────────────────────────────────────
+  const wind7max=d.windspeed_10m_max;
+  const windMax7=Math.max(...wind7max);
+  const windAvg7=wind7max.reduce((a,b)=>a+b,0)/wind7max.length;
+  const windMax24=Math.max(...h.wind_speed_10m.slice(hi,hi+24));
+  const windDir24=c.wind_direction_10m;
+  const giorni=['Dom','Lun','Mar','Mer','Gio','Ven','Sab'];
+  const wBarMax=Math.max(windMax7,1);
 
-  // Giorni con vento problematico
-  const windDaysWarn = wind7max.filter(w => w > 25 && w <= 45).length;
-  const windDaysDanger = wind7max.filter(w => w > 45).length;
-  const giorni = ['Dom','Lun','Mar','Mer','Gio','Ven','Sab'];
+  let windAdvice=[];
+  if(windMax24>50) windAdvice.push({col:'var(--red)',txt:'Vento pericoloso oggi: spostare i vasi al riparo, rischio ribaltamento e rottura steli.'});
+  else if(windMax24>30) windAdvice.push({col:'var(--yellow)',txt:`Vento forte (${windMax24} km/h): raggruppare i vasi contro un muro o appesantirli.`});
+  else if(windMax24>15) windAdvice.push({col:'var(--text2)',txt:`Vento moderato (${windMax24} km/h): utile per ridurre l'umidità fogliare, ma aumenta la traspirazione — irrigare più spesso.`});
+  else windAdvice.push({col:'var(--green)',txt:'Vento leggero. Condizioni ottimali per la pianta.'});
+  if(windMax7>45) windAdvice.push({col:'var(--orange)',txt:`Raffica massima prevista: ${windMax7} km/h. Verificare e rinforzare i tutori.`});
+  const windPollin=wind7max.filter(w=>w>=10&&w<=25).length;
+  if(windPollin>=3) windAdvice.push({col:'var(--green)',txt:`${windPollin} giorni con vento ottimale (10–25 km/h): favorisce l'impollinazione naturale.`});
+  else if(windPollin<=1&&windAvg7<8) windAdvice.push({col:'var(--text2)',txt:'Settimana ferma: agitare i rami a mano per favorire l\'impollinazione.'});
+  if(windAvg7>20) windAdvice.push({col:'var(--yellow)',txt:`Vento sostenuto (media ${windAvg7.toFixed(0)} km/h): ET reale superiore al valore calcolato. Anticipare l'irrigazione.`});
 
-  // Consigli specifici per vaso/terrazzo
-  let windAdvice = [];
-  if (windMax24 > 50) {
-    windAdvice.push({ col: 'var(--red)', txt: 'Spostare i vasi in posizione riparata o all\'interno — rischio ribaltamento e rottura steli.' });
-  } else if (windMax24 > 30) {
-    windAdvice.push({ col: 'var(--yellow)', txt: 'Vento forte oggi: appesantire i vasi con pietre sul fondo o raggrupparli contro un muro.' });
-  } else if (windMax24 > 15) {
-    windAdvice.push({ col: 'var(--text2)', txt: 'Vento moderato: utile contro la bagnatura fogliare, ma può disidratare. Aumentare l\'irrigazione.' });
-  } else {
-    windAdvice.push({ col: 'var(--green)', txt: 'Vento leggero o assente. Condizioni ideali: la pianta traspira normalmente.' });
-  }
-
-  if (windMax7 > 45) windAdvice.push({ col: 'var(--orange)', txt: `Raffica massima settimanale: ${windMax7} km/h. Controllare i tutori prima del weekend.` });
-
-  // Effetto impollinazione: vento 10-25 km/h favorisce l'impollinazione dei fiori di peperone
-  const windPollin = wind7max.filter(w => w >= 10 && w <= 25).length;
-  if (windPollin >= 3) windAdvice.push({ col: 'var(--green)', txt: `${windPollin} giorni con vento ottimale (10–25 km/h): favorisce l'impollinazione naturale dei fiori.` });
-  else if (windPollin <= 1 && windAvg7 < 8) windAdvice.push({ col: 'var(--text3)', txt: 'Settimana con poco vento: agitare delicatamente i rami a fioritura avanzata per favorire l\'impollinazione.' });
-
-  // Effetto essiccazione: vento > 20 km/h aumenta ET
-  if (windAvg7 > 20) windAdvice.push({ col: 'var(--yellow)', txt: `Vento costante (media ${windAvg7.toFixed(0)} km/h): l\'evapotraspirazione reale è più alta dell\'ET₀ calcolata. Irrigare con anticipo.` });
-
-  // Barre 7 giorni
-  const wBarMax = Math.max(windMax7, 1);
-  const today = new Date();
-  const windBars = wind7max.map((w, i) => {
-    const dayName = i === 0 ? 'Oggi' : giorni[new Date(d.time[i] + 'T12:00:00').getDay()];
-    const pct = (w / wBarMax * 100).toFixed(0);
-    const col = w > 45 ? 'var(--red)' : w > 25 ? 'var(--yellow)' : w > 10 ? 'var(--green)' : 'rgba(255,255,255,0.2)';
-    return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;">
-      <div style="font-size:10px;color:var(--text3);">${w}</div>
-      <div style="width:100%;height:50px;background:rgba(255,255,255,0.06);border-radius:3px;display:flex;align-items:flex-end;">
-        <div style="width:100%;height:${pct}%;background:${col};border-radius:3px;transition:height 0.5s;min-height:2px;"></div>
+  const windBars=wind7max.map((w,i)=>{
+    const name=i===0?'Oggi':giorni[new Date(d.time[i]+'T12:00:00').getDay()];
+    const pct=(w/wBarMax*100).toFixed(0);
+    const col=w>45?'var(--red)':w>25?'var(--yellow)':w>10?'var(--green)':'rgba(255,255,255,0.15)';
+    return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;">
+      <span style="font-size:13px;font-weight:600;color:var(--text2);">${w}</span>
+      <div style="width:100%;height:56px;background:rgba(255,255,255,0.05);border-radius:4px;display:flex;align-items:flex-end;">
+        <div style="width:100%;height:${pct}%;background:${col};border-radius:4px;transition:height 0.6s;min-height:3px;"></div>
       </div>
-      <div style="font-size:9px;color:var(--text3);">${dayName}</div>
+      <span style="font-size:12px;color:var(--text2);">${name}</span>
     </div>`;
   }).join('');
 
   container.innerHTML += `
-    <div class="agro-card" style="grid-column: span 2;">
-      <div class="agro-card-title"><div class="agro-icon" style="background:rgba(79,195,247,0.15)">💨</div>Vento — Analisi 7 Giorni</div>
-      <div style="display:flex;gap:6px;align-items:flex-end;margin-bottom:14px;">${windBars}</div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
-        <div style="font-size:11px;color:var(--text3);display:flex;align-items:center;gap:4px;"><span style="display:inline-block;width:8px;height:8px;background:var(--green);border-radius:2px;"></span>10–25 km/h: impollinazione ottimale</div>
-        <div style="font-size:11px;color:var(--text3);display:flex;align-items:center;gap:4px;"><span style="display:inline-block;width:8px;height:8px;background:var(--yellow);border-radius:2px;"></span>&gt;25 km/h: stress meccanico</div>
-        <div style="font-size:11px;color:var(--text3);display:flex;align-items:center;gap:4px;"><span style="display:inline-block;width:8px;height:8px;background:var(--red);border-radius:2px;"></span>&gt;45 km/h: pericolo rottura</div>
+    <div class="agro-card" style="grid-column:span 2;">
+      <div class="agro-card-title"><div class="agro-icon blue">💨</div>Vento — Analisi 7 Giorni</div>
+      <div style="display:flex;gap:8px;align-items:flex-end;margin-bottom:16px;">${windBars}</div>
+      <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:14px;">
+        ${[['var(--green)','10–25 km/h: impollinazione'],['var(--yellow)','>25 km/h: stress meccanico'],['var(--red)','>45 km/h: pericolo rottura']]
+          .map(([col,lbl])=>`<div style="display:flex;align-items:center;gap:6px;${S.note}"><span style="width:10px;height:10px;border-radius:2px;background:${col};flex-shrink:0;display:inline-block;"></span>${lbl}</div>`).join('')}
       </div>
-      <div style="display:flex;flex-direction:column;gap:7px;">
-        ${windAdvice.map(a => `<div style="font-size:12px;color:${a.col};line-height:1.5;padding-left:8px;border-left:2px solid ${a.col};">${a.txt}</div>`).join('')}
+      <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:4px;">
+        ${windAdvice.map(a=>`<div style="${S.advice(a.col)}">${a.txt}</div>`).join('')}
       </div>
-      <div style="font-size:10px;color:var(--text3);border-top:1px solid rgba(255,255,255,0.07);padding-top:7px;margin-top:10px;">Max 7gg: ${windMax7} km/h · Media: ${windAvg7.toFixed(0)} km/h · Direzione attuale: ${windDirName(windDir24)} (${windDir24}°)</div>
+      <div style="${S.foot}">Max 7gg: ${windMax7} km/h · Media: ${windAvg7.toFixed(0)} km/h · Dir. attuale: ${windDirName(windDir24)} (${windDir24}°)</div>
     </div>`;
 
-  // --- Radiazione / Fotosintesi ---
-  const radScore = cl => cl < 20 ? 95 : cl < 50 ? 75 : cl < 80 ? 50 : 25;
-  const cloudNow = c.cloud_cover;
-  const rad = radScore(cloudNow);
-  const uvStr = uv >= 8 ? 'Proteggere le piantine giovani dall\'esposizione diretta.' : uv >= 5 ? 'Buona intensità luminosa per la fotosintesi.' : 'Luce sufficiente. Considera integrazione per colture in serra.';
+  // ─────────────────────────────────────────────────────────────────────
+  // 8. RADIAZIONE & FOTOSINTESI
+  // ─────────────────────────────────────────────────────────────────────
+  const cloudNow=c.cloud_cover;
+  const rad=cloudNow<20?95:cloudNow<50?75:cloudNow<80?50:25;
+  const radCol=rad>70?'var(--yellow)':rad>40?'var(--orange)':'var(--text2)';
+  const uvDesc=uv>=8?'UV intenso: acclimatare le piantine giovani con esposizione graduale.':uv>=5?'Buona intensità per la fotosintesi attiva.':'Luce sufficiente. In serra valuta luce supplementare.';
 
   container.innerHTML += `
     <div class="agro-card">
       <div class="agro-card-title"><div class="agro-icon yellow">☀️</div>Radiazione & Fotosintesi</div>
-      <div style="display:flex;align-items:baseline;gap:6px;margin-bottom:8px;">
-        <div style="font-size:28px;font-weight:700;color:var(--yellow)">${rad}%</div>
-        <div style="font-size:12px;color:var(--text3)">efficienza stimata</div>
+      <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:8px;">
+        <span style="${S.big}color:${radCol};">${rad}%</span>
+        <span style="${S.note}">efficienza stimata</span>
       </div>
-      <div class="stress-bar-track"><div class="stress-bar-fill" style="width:${rad}%;background:var(--yellow)"></div></div>
-      <div style="font-size:12px;color:var(--text2);margin-top:8px;">UV max: ${uv} · ${uvStr}</div>
+      <div style="${S.barTrack}"><div style="${S.barFill(rad,radCol)}"></div></div>
+      <div style="${S.note};margin-top:10px;">UV max: <strong>${uv}</strong> · ${uvDesc}</div>
+      <div style="${S.foot}">Copertura nuvolosa: ${cloudNow}%</div>
     </div>`;
 }
-
 // =====================
 // TEMPERATURE WINDOWS
 // =====================
