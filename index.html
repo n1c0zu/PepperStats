@@ -163,7 +163,7 @@
   /* STAT GRID */
   .stat-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(185px, 1fr));
+    grid-template-columns: repeat(4, 1fr);
     gap: 14px; margin-bottom: 32px;
   }
   .stat-card {
@@ -172,6 +172,8 @@
     border-radius: var(--radius-sm);
     padding: 18px 20px;
     position: relative; overflow: hidden;
+    display: flex; flex-direction: column; justify-content: space-between;
+    min-height: 100px;
   }
   .stat-card::before {
     content: '';
@@ -408,7 +410,7 @@
 
     /* stat grid: 1 colonna piena larghezza */
     .stat-grid {
-      grid-template-columns: 1fr;
+      grid-template-columns: repeat(2, 1fr);
       gap: 8px;
       margin-bottom: 20px;
     }
@@ -1360,33 +1362,106 @@ function renderAlerts(c, h, d, hi, et0, uv, soilT, hum) {
   container.innerHTML = '';
   const alerts = [];
 
-  const maxWind24 = Math.max(...h.wind_speed_10m.slice(hi, hi + 24));
-  const minTemp24 = Math.min(...h.temperature_2m.slice(hi, hi + 24));
-  const maxTemp24 = Math.max(...h.temperature_2m.slice(hi, hi + 24));
-  const totalRain24 = d.precipitation_sum[0] + (d.precipitation_sum[1] || 0);
+  const maxWind24  = Math.max(...h.wind_speed_10m.slice(hi, hi + 24));
+  const minTemp24  = Math.min(...h.temperature_2m.slice(hi, hi + 24));
+  const maxTemp24  = Math.max(...h.temperature_2m.slice(hi, hi + 24));
+  const rain7      = d.precipitation_sum.slice(0,7).reduce((a,b)=>a+b,0);
+  const rain2      = d.precipitation_sum[0] + (d.precipitation_sum[1]||0);
+  const tMax7      = Math.max(...d.temperature_2m_max);
+  const tMin7      = Math.min(...d.temperature_2m_min);
+  const tempNow    = h.temperature_2m[hi];
+  const wind7max   = d.windspeed_10m_max || [];
+  const windMax7   = wind7max.length ? Math.max(...wind7max) : 0;
 
-  if (minTemp24 < 0) alerts.push({ type: 'danger', icon: '❄️', msg: `ALLERTA GELATA: temperatura minima prevista di ${minTemp24}°C. Proteggere immediatamente le piante con teli termici o portarle al riparo.` });
-  else if (minTemp24 < 8) alerts.push({ type: 'warn', icon: '🌡️', msg: `Temperatura notturna sotto soglia critica (${minTemp24}°C). Rientrare le piante prima del tramonto.` });
+  // ── TEMPERATURA ──────────────────────────────────────────────────────
+  if (minTemp24 < 0)
+    alerts.push({ type:'danger', icon:'❄️', msg:`GELATA IMMINENTE: ${minTemp24}°C previsti. Portare le piante al riparo subito. Danni permanenti ai tessuti sotto 0°C.` });
+  else if (minTemp24 < 8)
+    alerts.push({ type:'warn', icon:'🌡️', msg:`Notte fredda (${minTemp24}°C): sotto soglia critica per il peperone. Rientrare le piante prima del tramonto.` });
 
-  if (maxTemp24 > 38) alerts.push({ type: 'danger', icon: '🔥', msg: `Caldo estremo: picco di ${maxTemp24}°C. Rischio aborto floreale e stress idrico. Ombreggiare e aumentare la frequenza di irrigazione.` });
-  else if (maxTemp24 > 32) alerts.push({ type: 'warn', icon: '☀️', msg: `Temperature elevate (${maxTemp24}°C). Possibile stress termico. Valutare ombreggiatura pomeridiana.` });
+  if (maxTemp24 > 40)
+    alerts.push({ type:'danger', icon:'🔥', msg:`Caldo estremo: picco di ${maxTemp24}°C. Aborto floreale quasi certo sopra 38°C. Ombreggiare e bagnare il substrato mattina e sera.` });
+  else if (maxTemp24 > 32)
+    alerts.push({ type:'warn', icon:'☀️', msg:`Caldo intenso (${maxTemp24}°C). Possibile stress e aborto floreale. Considera ombra pomeridiana e irrigazione anticipata.` });
 
-  if (maxWind24 > 50) alerts.push({ type: 'danger', icon: '💨', msg: `Vento molto forte (${maxWind24} km/h). Verificare e rinforzare i tutori. Considerare protezione con rete frangivento.` });
-  else if (maxWind24 > 30) alerts.push({ type: 'warn', icon: '💨', msg: `Vento moderato-forte previsto (${maxWind24} km/h). Controllare i supporti delle piante.` });
+  // ── VENTO ────────────────────────────────────────────────────────────
+  if (maxWind24 > 50)
+    alerts.push({ type:'danger', icon:'💨', msg:`Vento pericoloso (${maxWind24} km/h). Rischio ribaltamento vasi e rottura steli. Spostare le piante all'interno o in posizione riparata.` });
+  else if (maxWind24 > 30)
+    alerts.push({ type:'warn', icon:'💨', msg:`Vento forte (${maxWind24} km/h). Controllare tutori e supporti. Aumentare l'irrigazione perché la traspirazione aumenta.` });
 
-  if (hum > 85 && maxTemp24 > 18) alerts.push({ type: 'warn', icon: '🦠', msg: `Rischio fitopatologico elevato: umidità ${hum}% + temperature favorevoli a Botrytis e Phytophthora. Considerare trattamento preventivo.` });
+  if (windMax7 > 50)
+    alerts.push({ type:'warn', icon:'🌬️', msg:`Settimana ventosa: picco atteso di ${windMax7} km/h. Rinforzare i tutori e verificare la stabilità dei vasi.` });
 
-  if (uv >= 10) alerts.push({ type: 'warn', icon: '🌞', msg: `Indice UV molto alto (${uv}). Le piantine in fase di acclimatamento potrebbero subire scottature fogliari. Iniziare con esposizione graduale.` });
+  // ── GRANDINE ─────────────────────────────────────────────────────────
+  const hailDays = d.weathercode ? d.weathercode.filter(code => code >= 96).length : 0;
+  if (hailDays > 0)
+    alerts.push({ type:'danger', icon:'🧊', msg:`Rischio grandine previsto (${hailDays} ${hailDays===1?'giorno':'giorni'} nella settimana). Proteggere le piante con rete antigrandine o spostarle al riparo nei giorni a rischio.` });
 
-  if (soilT < 12) alerts.push({ type: 'info', icon: '🌱', msg: `Temperatura del suolo subottimale (${soilT}°C). L'assorbimento radicale di fosforo e microelementi è ridotto sotto i 15°C. Evitare fertilizzazioni di fondo.` });
-  else if (soilT > 32) alerts.push({ type: 'warn', icon: '🟤', msg: `Suolo molto caldo (${soilT}°C). Applicare pacciamatura per ridurre la temperatura e limitare l'evaporazione.` });
+  // ── UMIDITÀ / PATOGENI ───────────────────────────────────────────────
+  if (hum > 85 && maxTemp24 > 18)
+    alerts.push({ type:'warn', icon:'🦠', msg:`Condizioni favorevoli a Botrytis e Phytophthora: umidità ${hum}% + T ${Math.round(maxTemp24)}°C. Trattamento preventivo con rame o prodotto specifico consigliato.` });
+  else if (hum > 75 && maxTemp24 > 20)
+    alerts.push({ type:'info', icon:'🔬', msg:`Umidità elevata (${hum}%): monitorare oidio e alternaria. Assicurarsi che le piante abbiano buona ventilazione tra loro.` });
 
-  if (et0 > 6) alerts.push({ type: 'info', icon: '💧', msg: `Evapotraspirazione elevata (${et0} mm). Incrementare i volumi di irrigazione. Irrigare preferibilmente nelle ore mattutine.` });
+  // ── FINESTRA TRATTAMENTI ─────────────────────────────────────────────
+  // Cerca le prossime ore con: no pioggia (<10%), vento <20km/h, ora 7-10 o 17-20
+  let treatWindows = [];
+  for (let i = hi; i < hi + 48 && i < h.time.length; i++) {
+    const hour = new Date(h.time[i]).getHours();
+    const goodTime = (hour >= 7 && hour <= 10) || (hour >= 17 && hour <= 20);
+    const noRain = (h.precipitation_probability[i] || 0) < 15;
+    const lightWind = h.wind_speed_10m[i] < 20;
+    if (goodTime && noRain && lightWind) {
+      const day  = i < hi+24 ? 'oggi' : 'domani';
+      const hStr = hour.toString().padStart(2,'0') + ':00';
+      const key  = day + '-' + (hour < 12 ? 'mattina' : 'sera');
+      if (!treatWindows.find(w => w.key === key))
+        treatWindows.push({ key, label: `${day} ore ${hStr}` });
+    }
+  }
+  if (treatWindows.length > 0)
+    alerts.push({ type:'info', icon:'🧴', msg:`Finestre ottimali per trattamenti fitosanitari (no pioggia, vento < 20 km/h, ore fresche): ${treatWindows.slice(0,3).map(w=>w.label).join(' · ')}.` });
+  else
+    alerts.push({ type:'info', icon:'🧴', msg:`Nessuna finestra ottimale per trattamenti nelle prossime 48 ore (pioggia o vento eccessivo). Attendere condizioni migliori.` });
 
-  if (totalRain24 > 40) alerts.push({ type: 'info', icon: '🌧️', msg: `Piogge abbondanti previste (${totalRain24.toFixed(1)} mm su 2 giorni). Verificare il drenaggio dei vasi. Sospendere l'irrigazione.` });
+  // ── UV / SCOTTATURE ──────────────────────────────────────────────────
+  if (uv >= 11)
+    alerts.push({ type:'danger', icon:'🌞', msg:`UV estremo (${uv}). Scottature fogliari quasi certe su piantine giovani. Ombreggiare obbligatoriamente nelle ore centrali (11–16).` });
+  else if (uv >= 8)
+    alerts.push({ type:'warn', icon:'🌞', msg:`UV molto alto (${uv}). Acclimatare le piantine con esposizione graduale. Evitare di innaffiare le foglie nelle ore di sole.` });
+
+  // ── SUOLO ────────────────────────────────────────────────────────────
+  if (soilT < 12)
+    alerts.push({ type:'info', icon:'🌱', msg:`Suolo freddo (${soilT}°C): assorbimento di fosforo e micronutrienti quasi bloccato sotto 12°C. Evitare concimazioni fino al riscaldamento del substrato.` });
+  else if (soilT > 32)
+    alerts.push({ type:'warn', icon:'🟤', msg:`Suolo molto caldo (${soilT}°C): rischio stress radicale. Applicare pacciamatura chiara o spostare i vasi in zona ombreggiata.` });
+
+  // ── IRRIGAZIONE / PIOGGE ─────────────────────────────────────────────
+  if (et0 > 7)
+    alerts.push({ type:'info', icon:'💧', msg:`Evapotraspirazione molto alta (${et0} mm). Irrigare mattina e sera. I vasi in pieno sole possono seccarsi in poche ore.` });
+  else if (et0 > 5)
+    alerts.push({ type:'info', icon:'💧', msg:`ET₀ elevata (${et0} mm). Aumentare la frequenza di irrigazione. Privilegiare le ore mattutine per ridurre l'evaporazione.` });
+
+  if (rain2 > 40)
+    alerts.push({ type:'info', icon:'🌧️', msg:`Piogge intense previste (${rain2.toFixed(0)} mm in 2 giorni). Controllare il drenaggio dei vasi. Sospendere ogni irrigazione.` });
+
+  // ── SICCITÀ 7 GIORNI ─────────────────────────────────────────────────
+  if (rain7 < 2 && et0 > 3)
+    alerts.push({ type:'warn', icon:'🏜️', msg:`Settimana secca: solo ${rain7.toFixed(0)} mm previsti con ET₀ ${et0} mm/giorno. Monitorare quotidianamente il substrato ed evitare di saltare irrigazioni.` });
+
+  // ── ESCURSIONE TERMICA ───────────────────────────────────────────────
+  const excursion = tMax7 - tMin7;
+  if (excursion > 20)
+    alerts.push({ type:'info', icon:'📊', msg:`Escursione termica settimana: ${excursion.toFixed(0)}°C (${tMin7}°–${tMax7}°). Alta escursione favorisce accumulo di capsaicina e zuccheri — ottimo per la qualità del frutto.` });
+
+  // ── OUTPUT ────────────────────────────────────────────────────────────
+  // Ordina: danger → warn → info
+  const order = { danger: 0, warn: 1, info: 2, ok: 3 };
+  alerts.sort((a,b) => order[a.type] - order[b.type]);
 
   if (alerts.length === 0) {
-    container.innerHTML = `<div class="alert ok"><div class="alert-icon">✅</div><div>Tutte le condizioni agrometeorologiche sono nella norma. Nessun intervento urgente richiesto per le prossime 24 ore.</div></div>`;
+    container.innerHTML = `<div class="alert ok"><div class="alert-icon">✅</div><div>Tutte le condizioni agrometeorologiche sono nella norma. Nessun intervento urgente richiesto.</div></div>`;
   } else {
     alerts.forEach(a => {
       container.innerHTML += `<div class="alert ${a.type}"><div class="alert-icon">${a.icon}</div><div>${a.msg}</div></div>`;
