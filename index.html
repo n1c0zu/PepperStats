@@ -234,21 +234,23 @@
   /* DAILY */
   .daily-list { display: flex; flex-direction: column; gap: 8px; }
   .daily-row {
-    display: grid; grid-template-columns: 70px 36px 1fr 80px 100px;
-    align-items: center; gap: 8px;
+    display: flex; flex-direction: column; gap: 7px;
     background: var(--card); border: 1px solid var(--card-border);
     border-radius: var(--radius-sm); padding: 12px 16px;
     font-size: 14px;
   }
-  .d-day { font-weight: 600; color: var(--text); }
-  .d-icon { font-size: 18px; text-align: center; }
+  .daily-row-top {
+    display: flex; align-items: center; gap: 10px;
+  }
+  .d-day { width: 52px; flex-shrink: 0; font-weight: 600; color: var(--text); }
+  .d-icon { width: 32px; flex-shrink: 0; font-size: 18px; text-align: center; }
+  .d-temp { flex: 1; font-weight: 700; color: var(--orange); }
+  .d-temp span { color: var(--text3); font-weight: 400; font-size: 12px; margin-left: 6px; }
+  .d-rain { font-size: 12px; color: var(--blue); text-align: right; flex-shrink: 0; min-width: 60px; }
   .d-bar-wrap {
     height: 6px; background: rgba(255,255,255,0.07); border-radius: 3px; overflow: hidden;
   }
   .d-bar-fill { height: 100%; border-radius: 3px; background: linear-gradient(to right, var(--blue), var(--orange)); }
-  .d-rain { font-size: 12px; color: var(--blue); text-align: center; }
-  .d-temp { text-align: right; font-weight: 700; color: var(--orange); }
-  .d-temp span { color: var(--text3); font-weight: 400; margin-left: 6px; font-size: 12px; }
 
   /* AGRO ANALYSIS */
   .agro-grid {
@@ -408,7 +410,7 @@
 
     /* search più compatta */
     .search-panel { padding: 12px 14px; gap: 8px; }
-    .search-wrap { width: 100%; }
+    .search-wrap { width: 100%; flex: 1; }
     .btn { padding: 10px 14px; font-size: 13px; }
 
     /* main padding ridotto */
@@ -420,27 +422,67 @@
     .location-info h2 { font-size: 17px; }
     .location-info .coords { font-size: 11px; }
 
-    /* stat grid 2 colonne fisse */
-    .stat-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
-    .stat-card { padding: 11px 13px; }
-    .stat-value { font-size: 18px; }
-    .stat-label { font-size: 10px; }
-    .stat-sub { font-size: 10px; }
+    /* stat grid: 2 colonne uguali, card più larghe e squadrate */
+    .stat-grid {
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+      margin-bottom: 20px;
+    }
+    .stat-card {
+      padding: 14px 14px 12px;
+      min-height: 80px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    .stat-value { font-size: 20px; }
+    .stat-label { font-size: 10px; letter-spacing: 0.4px; }
+    .stat-sub { font-size: 10px; margin-top: 2px; }
 
     /* section title */
     .section-title { font-size: 11px; margin: 20px 0 10px; }
 
-    /* hourly cards più strette */
-    .hourly-card { min-width: 66px; padding: 10px 6px; gap: 4px; }
+    /* hourly cards */
+    .hourly-card { min-width: 68px; padding: 10px 6px; gap: 4px; }
     .h-temp { font-size: 13px; }
     .h-icon { font-size: 17px; }
     .h-time { font-size: 10px; }
 
-    /* daily: nascondi barra e pioggia, mostra solo giorno+icona+temp */
-    .daily-row { grid-template-columns: 52px 28px 1fr 80px; padding: 10px 12px; font-size: 13px; gap: 6px; }
-    .d-bar-wrap { display: none; }
-    .d-rain { font-size: 11px; }
-    .d-temp { font-size: 13px; }
+    /* daily: layout a 2 righe per riga
+       riga 1: giorno | icona | min°→max° | pioggia
+       riga 2: barra termica piena larghezza */
+    .daily-row {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding: 10px 14px;
+      font-size: 13px;
+    }
+    .daily-row-top {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .d-day { width: 44px; flex-shrink: 0; font-weight: 600; color: var(--text); }
+    .d-icon { width: 26px; flex-shrink: 0; font-size: 17px; text-align: center; }
+    .d-temp {
+      flex: 1;
+      text-align: left;
+      font-weight: 700;
+      color: var(--orange);
+      font-size: 13px;
+    }
+    .d-temp span { color: var(--text3); font-weight: 400; font-size: 12px; margin-left: 4px; }
+    .d-rain { width: auto; font-size: 11px; color: var(--blue); text-align: right; flex-shrink: 0; }
+    /* barra termica su riga piena */
+    .d-bar-wrap {
+      display: block !important;
+      height: 5px;
+      background: rgba(255,255,255,0.07);
+      border-radius: 3px;
+      overflow: hidden;
+      width: 100%;
+    }
 
     /* agro grid 1 colonna */
     .agro-grid { grid-template-columns: 1fr; gap: 10px; }
@@ -449,15 +491,14 @@
     .alert { font-size: 12px; padding: 10px 12px; }
     .alert-icon { font-size: 14px; }
 
-    /* legenda leggenda più compatta */
+    /* legenda compatta */
     .section-legend { flex-direction: column; gap: 4px; }
   }
 
   @media (max-width: 380px) {
     .current-temp { font-size: 42px; }
     .hero-right { display: none !important; }
-    .hourly-card { min-width: 58px; }
-    .stat-grid { grid-template-columns: repeat(2, 1fr); }
+    .hourly-card { min-width: 60px; }
   }
 </style>
 </head>
@@ -943,8 +984,7 @@ function renderHourly(h, hi) {
 function renderDaily(d) {
   const container = document.getElementById('dailyForecast');
   container.innerHTML = '';
-  const allMax = d.temperature_2m_max;
-  const globalMax = Math.max(...allMax);
+  const globalMax = Math.max(...d.temperature_2m_max);
   const globalMin = Math.min(...d.temperature_2m_min);
   const range = globalMax - globalMin || 1;
 
@@ -959,11 +999,15 @@ function renderDaily(d) {
 
     container.innerHTML += `
       <div class="daily-row">
-        <div class="d-day">${name}</div>
-        <div class="d-icon">${icon}</div>
-        <div class="d-bar-wrap"><div class="d-bar-fill" style="margin-left:${barLeft}%; width:${barWidth}%"></div></div>
-        <div class="d-rain">${rain > 0 ? '💧' + rain + 'mm' : '—'}</div>
-        <div class="d-temp">${tmax}°<span>${tmin}°</span></div>
+        <div class="daily-row-top">
+          <div class="d-day">${name}</div>
+          <div class="d-icon">${icon}</div>
+          <div class="d-temp">${tmax}°<span>${tmin}°</span></div>
+          <div class="d-rain">${rain > 0 ? '💧' + rain + 'mm' : ''}</div>
+        </div>
+        <div class="d-bar-wrap">
+          <div class="d-bar-fill" style="margin-left:${barLeft}%; width:${barWidth}%"></div>
+        </div>
       </div>`;
   }
 }
