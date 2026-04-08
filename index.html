@@ -739,33 +739,135 @@ function renderAgronomy(c, h, d, hi, et0, uv, soilT, hum) {
   const container = document.getElementById('agroGrid');
   container.innerHTML = '';
 
-  // --- GDD (Growing Degree Days) ---
-  const BASE_TEMP = 10; // Base per peperoni
-  const todayGDD = Math.max(0, ((d.temperature_2m_max[0] + d.temperature_2m_min[0]) / 2) - BASE_TEMP);
-  const weekGDD = d.temperature_2m_max.slice(0, 7).reduce((acc, tmax, i) => {
-    return acc + Math.max(0, ((tmax + d.temperature_2m_min[i]) / 2) - BASE_TEMP);
-  }, 0);
-  const gddPhase = weekGDD < 10 ? 0 : weekGDD < 40 ? 1 : weekGDD < 80 ? 2 : 3;
-  const phases = [
-    { name: 'Germinazione', min: 0 },
-    { name: 'Vegetativo', min: 10 },
-    { name: 'Fioritura', min: 40 },
-    { name: 'Fruttificazione', min: 80 },
-  ];
+  // --- PIANO FERTILIZZAZIONE ---
+  // Logica: l'assorbimento nutritivo dipende da T suolo, ET0 (attività radicale) e umidità
+  // Sotto 15°C suolo: radici assorbono poco, concimazione sprecata
+  // ET0 alta = pianta attiva = alta domanda nutritiva
+  // Umidità >85% = rischio dilavamento azoto + blocco Ca/Mg
+  const tAvg7 = d.temperature_2m_max.slice(0,7).reduce((a,b,i)=>a+(b+d.temperature_2m_min[i])/2,0)/7;
+  const rain7f = d.precipitation_sum.slice(0,7).reduce((a,b)=>a+b,0);
+
+  // Assorbimento radicale (0-100)
+  const rootAbsorption = soilT < 12 ? 20 : soilT < 15 ? 45 : soilT < 28 ? 90 : soilT < 33 ? 70 : 35;
+  // Domanda nutritiva
+  const nutrientDemand = et0 > 5 ? 'alta' : et0 > 2.5 ? 'media' : 'bassa';
+
+  // Tipo concime consigliato in base a condizioni
+  let fertType, fertNote, fertColor, fertFreq;
+  if (soilT < 12) {
+    fertType = 'Sospendere';
+    fertNote = 'Suolo troppo freddo ('+soilT+'°C): radici inattive, il concime rimane inutilizzato nel substrato e rischia di accumularsi come sale.';
+    fertColor = 'var(--blue)'; fertFreq = '—';
+  } else if (hum > 85 && rain7f > 30) {
+    fertType = 'Solo Ca/Mg fogliari';
+    fertNote = 'Piogge abbondanti ('+rain7f.toFixed(0)+'mm/7gg) dilavano azoto e potassio. Evita concimi idrosolubili al suolo. Utile uno spray fogliare di calcio e magnesio per prevenire marciumi apicali.';
+    fertColor = 'var(--blue)'; fertFreq = 'Una volta a settimana fogliare';
+  } else if (tAvg7 > 28 && et0 > 5) {
+    fertType = 'K+ e microelementi';
+    fertNote = 'Caldo intenso con alta evapotraspirazione: la pianta è in stress idrico e consuma potassio per regolare gli stomi. Priorità a concimi con K alto (es. 5-10-30). Aggiungere boro per supportare la fioritura.';
+    fertColor = 'var(--orange)'; fertFreq = 'Ogni 5–7 giorni';
+  } else if (tAvg7 >= 18 && et0 >= 2.5) {
+    fertType = 'NPK bilanciato (fase attiva)';
+    fertNote = 'Condizioni ideali per l\'assorbimento radicale. Usa un concime completo NPK (es. 7-7-7 o 6-12-36 in fioritura). Integra calcio se hai avuto marciumi apicali in passato.';
+    fertColor = 'var(--green)'; fertFreq = 'Ogni 7–10 giorni';
+  } else {
+    fertType = 'N leggero (fase lenta)';
+    fertNote = 'Temperature miti con bassa evapotraspirazione: crescita rallentata. Usa una dose ridotta di azoto organico (es. guano diluito) per sostenere il fogliame senza forzare.';
+    fertColor = 'var(--text2)'; fertFreq = 'Ogni 12–15 giorni';
+  }
+
+  const absBar = rootAbsorption;
+  const absColor = rootAbsorption > 70 ? 'var(--green)' : rootAbsorption > 40 ? 'var(--yellow)' : 'var(--red)';
 
   container.innerHTML += `
     <div class="agro-card">
-      <div class="agro-card-title">
-        <div class="agro-icon green">🌱</div>
-        Gradi Giorno (GDD)
+      <div class="agro-card-title"><div class="agro-icon green">🧪</div>Piano Fertilizzazione</div>
+      <div style="margin-bottom:10px;">
+        <div style="font-size:11px;color:var(--text3);margin-bottom:3px;">Assorbimento radicale stimato</div>
+        <div style="position:relative;height:8px;background:rgba(255,255,255,0.08);border-radius:4px;margin-bottom:4px;">
+          <div style="height:100%;width:${absBar}%;background:${absColor};border-radius:4px;transition:width 0.5s;"></div>
+        </div>
+        <div style="font-size:10px;color:var(--text3);">T suolo ${soilT}°C · Domanda nutritiva: ${nutrientDemand}</div>
       </div>
-      <div class="gdd-display">
-        <div class="gdd-big">${todayGDD.toFixed(1)}</div>
-        <div class="gdd-label">GDD oggi · Base ${BASE_TEMP}°C · Settimana: ${weekGDD.toFixed(1)}</div>
+      <div style="margin-bottom:8px;">
+        <div style="font-size:13px;font-weight:700;color:${fertColor};margin-bottom:4px;">${fertType}</div>
+        <div style="font-size:11px;color:var(--text3);margin-bottom:6px;">Frequenza: ${fertFreq}</div>
+        <div style="font-size:12px;color:var(--text2);line-height:1.5;">${fertNote}</div>
       </div>
-      <div class="gdd-phases">
-        ${phases.map((p, i) => `<div class="gdd-phase${i === gddPhase ? ' active' : ''}"><div class="gdd-phase-name">${p.name.substring(0,5)}</div><div>≥${p.min}</div></div>`).join('')}
+      <div style="font-size:10px;color:var(--text3);border-top:1px solid rgba(255,255,255,0.07);padding-top:6px;margin-top:2px;">Basato su: T suolo ${soilT}°C · ET₀ ${et0}mm · Umidità ${hum}% · Pioggia 7gg ${rain7f.toFixed(0)}mm</div>
+    </div>`;
+
+  // --- INDICE QUALITÀ FRUTTO ---
+  // Capsaicina aumenta con: stress idrico moderato, UV alti, escursione termica alta, T >25°C
+  // Colore/maturazione: escursione >12°C accelera viraggio, UV>6 intensifica colore
+  // Zuccheri: T media 22-28°C ottimale, si riducono con piogge eccessive
+  const tRange7avg = d.temperature_2m_max.slice(0,7).reduce((a,b,i)=>a+(b-d.temperature_2m_min[i]),0)/7;
+  const tMed = (d.temperature_2m_max[0] + d.temperature_2m_min[0]) / 2;
+  const rainExcess = rain7f > 40;
+
+  // Score capsaicina (piccantezza) 0-100
+  const capsScore = Math.min(100, Math.max(0,
+    (uv >= 6 ? 25 : uv >= 3 ? 12 : 0) +
+    (tRange7avg >= 12 ? 25 : tRange7avg >= 8 ? 15 : 5) +
+    (tMed >= 25 && tMed <= 32 ? 30 : tMed >= 20 ? 18 : 5) +
+    (et0 > 4 && !rainExcess ? 20 : et0 > 2 ? 10 : 0)
+  ));
+
+  // Score colore/maturazione 0-100
+  const colorScore = Math.min(100, Math.max(0,
+    (uv >= 7 ? 35 : uv >= 4 ? 20 : 8) +
+    (tRange7avg >= 10 ? 30 : tRange7avg >= 6 ? 18 : 6) +
+    (tMed >= 22 && tMed <= 30 ? 25 : tMed >= 18 ? 12 : 3) +
+    (!rainExcess ? 10 : 0)
+  ));
+
+  // Score dolcezza/zuccheri 0-100
+  const sugarScore = Math.min(100, Math.max(0,
+    (tMed >= 22 && tMed <= 28 ? 40 : tMed >= 18 ? 20 : 8) +
+    (uv >= 5 ? 25 : uv >= 3 ? 14 : 5) +
+    (!rainExcess ? 20 : 5) +
+    (hum < 75 ? 15 : hum < 85 ? 8 : 0)
+  ));
+
+  const scoreBar = (val, color) => `
+    <div style="position:relative;height:7px;background:rgba(255,255,255,0.08);border-radius:4px;">
+      <div style="height:100%;width:${val}%;background:${color};border-radius:4px;transition:width 0.5s;"></div>
+    </div>`;
+
+  const capsNote = capsScore > 70 ? 'Condizioni favorevoli alla sintesi di capsaicina' : capsScore > 40 ? 'Piccantezza nella media' : 'Stress ridotto — frutto tendenzialmente dolce';
+  const colorNote = colorScore > 70 ? 'Viraggio rapido e colore intenso previsto' : colorScore > 40 ? 'Maturazione regolare' : 'Maturazione lenta — scarsità di luce o T basse';
+  const sugarNote = sugarScore > 70 ? 'Alta concentrazione zuccherina (sapore pieno)' : sugarScore > 40 ? 'Dolcezza nella norma' : 'Piogge o T anomale possono diluire gli zuccheri';
+
+  container.innerHTML += `
+    <div class="agro-card">
+      <div class="agro-card-title"><div class="agro-icon red">🌶️</div>Indice Qualità Frutto</div>
+      <div style="display:flex;flex-direction:column;gap:11px;">
+        <div>
+          <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+            <span style="font-size:12px;color:var(--text2);">🔥 Piccantezza (capsaicina)</span>
+            <span style="font-size:12px;font-weight:700;color:var(--orange)">${capsScore}/100</span>
+          </div>
+          ${scoreBar(capsScore,'var(--orange)')}
+          <div style="font-size:10px;color:var(--text3);margin-top:3px;">${capsNote}</div>
+        </div>
+        <div>
+          <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+            <span style="font-size:12px;color:var(--text2);">🎨 Colore e maturazione</span>
+            <span style="font-size:12px;font-weight:700;color:var(--red)">${colorScore}/100</span>
+          </div>
+          ${scoreBar(colorScore,'var(--red)')}
+          <div style="font-size:10px;color:var(--text3);margin-top:3px;">${colorNote}</div>
+        </div>
+        <div>
+          <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+            <span style="font-size:12px;color:var(--text2);">🍬 Dolcezza (zuccheri)</span>
+            <span style="font-size:12px;font-weight:700;color:var(--yellow)">${sugarScore}/100</span>
+          </div>
+          ${scoreBar(sugarScore,'var(--yellow)')}
+          <div style="font-size:10px;color:var(--text3);margin-top:3px;">${sugarNote}</div>
+        </div>
       </div>
+      <div style="font-size:10px;color:var(--text3);border-top:1px solid rgba(255,255,255,0.07);padding-top:7px;margin-top:10px;">Basato su: UV ${uv} · Escursione media 7gg ${tRange7avg.toFixed(1)}°C · T media ${tMed.toFixed(1)}°C · Pioggia ${rain7f.toFixed(0)}mm</div>
     </div>`;
 
   // --- Rischio Patogeni ---
