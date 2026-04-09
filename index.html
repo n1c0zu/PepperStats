@@ -621,7 +621,7 @@
         <div class="stat-sub" id="pressureSub"></div>
       </div>
       <div class="stat-card soil">
-        <div class="stat-label">Umidità suolo</div>
+        <div class="stat-label">Umidità suolo <span style="font-size:9px;opacity:0.6;font-weight:400;text-transform:none;">(stima)</span></div>
         <div class="stat-value" id="soilMoist">—<span class="stat-unit">%</span></div>
         <div class="stat-sub" id="soilMoistSub"></div>
       </div>
@@ -976,7 +976,7 @@ function renderUI(locName, lat, lon, elev, data) {
   const et3   = (d.et0_fao_evapotranspiration[0]||0) * 3;
   const soilMoist = Math.min(100, Math.max(5, Math.round(50 + (rain3 * 2.5) - (et3 * 1.8) + (soilT > 25 ? -8 : soilT < 12 ? +5 : 0))));
   document.getElementById('soilMoist').innerHTML = `${soilMoist}<span class="stat-unit">%</span>`;
-  document.getElementById('soilMoistSub').innerText = soilMoist > 75 ? 'Substrato saturo' : soilMoist > 55 ? 'Ben idratato' : soilMoist > 35 ? 'Leggermente asciutto' : soilMoist > 20 ? 'Secco — irrigare' : 'Molto secco — urgente';
+  document.getElementById('soilMoistSub').innerHTML = (soilMoist > 75 ? 'Substrato saturo' : soilMoist > 55 ? 'Ben idratato' : soilMoist > 35 ? 'Leggermente asciutto' : soilMoist > 20 ? 'Secco — irrigare' : 'Molto secco — urgente') + '<br><span style="font-size:9px;opacity:0.55;">Basata su piogge+ET₀, non su sensore</span>';
 
   // HOURLY
   renderHourly(h, hi);
