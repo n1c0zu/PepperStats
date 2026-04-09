@@ -603,6 +603,21 @@
         <div class="stat-value" id="clouds">—<span class="stat-unit">%</span></div>
         <div class="stat-sub" id="cloudSub"></div>
       </div>
+      <div class="stat-card sun">
+        <div class="stat-label">Ore di sole oggi</div>
+        <div class="stat-value" id="sunshineHours">—<span class="stat-unit">h</span></div>
+        <div class="stat-sub" id="sunshineSub"></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Alba / Tramonto</div>
+        <div class="stat-value" id="sunriseDisplay" style="font-size:18px;">—</div>
+        <div class="stat-sub" id="daylightSub"></div>
+      </div>
+      <div class="stat-card temp">
+        <div class="stat-label">Pressione</div>
+        <div class="stat-value" id="pressureDisplay">—<span class="stat-unit">hPa</span></div>
+        <div class="stat-sub" id="pressureSub"></div>
+      </div>
     </div>
 
     <!-- HOURLY -->
@@ -683,9 +698,9 @@ function startAutoRefresh() {
 async function silentRefresh() {
   try {
     const url = `https://api.open-meteo.com/v1/forecast?latitude=${lastLat}&longitude=${lastLon}` +
-      `&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,wind_speed_10m,wind_direction_10m,cloud_cover,weathercode,is_day` +
+      `&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,wind_speed_10m,wind_direction_10m,cloud_cover,weathercode,is_day,surface_pressure` +
       `&hourly=temperature_2m,precipitation_probability,wind_speed_10m,soil_temperature_6cm,weathercode,is_day,relativehumidity_2m,dewpoint_2m` +
-      `&daily=temperature_2m_max,temperature_2m_min,uv_index_max,et0_fao_evapotranspiration,weathercode,precipitation_sum,windspeed_10m_max,sunrise,sunset` +
+      `&daily=temperature_2m_max,temperature_2m_min,uv_index_max,et0_fao_evapotranspiration,weathercode,precipitation_sum,windspeed_10m_max,sunrise,sunset,sunshine_duration` +
       `&timezone=auto&forecast_days=7`;
     const res = await fetch(url);
     const data = await res.json();
@@ -843,9 +858,9 @@ async function fetchWeather(lat, lon, locName, elev = 0) {
   saveLocation(lat, lon, locName, elev);
   try {
     const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
-      `&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,wind_speed_10m,wind_direction_10m,cloud_cover,weathercode,is_day` +
+      `&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,wind_speed_10m,wind_direction_10m,cloud_cover,weathercode,is_day,surface_pressure` +
       `&hourly=temperature_2m,precipitation_probability,wind_speed_10m,soil_temperature_6cm,weathercode,is_day,relativehumidity_2m,dewpoint_2m` +
-      `&daily=temperature_2m_max,temperature_2m_min,uv_index_max,et0_fao_evapotranspiration,weathercode,precipitation_sum,windspeed_10m_max,sunrise,sunset` +
+      `&daily=temperature_2m_max,temperature_2m_min,uv_index_max,et0_fao_evapotranspiration,weathercode,precipitation_sum,windspeed_10m_max,sunrise,sunset,sunshine_duration` +
       `&timezone=auto&forecast_days=7`;
     const res = await fetch(url);
     const data = await res.json();
@@ -918,6 +933,36 @@ function renderUI(locName, lat, lon, elev, data) {
   document.getElementById('clouds').innerHTML = `${cl}<span class="stat-unit">%</span>`;
   document.getElementById('cloudSub').innerText = cl < 20 ? 'Cielo sereno' : cl < 60 ? 'Parz. coperto' : 'Coperto';
 
+  // Ore di sole (sunshine_duration è in secondi)
+  const sunSec = d.sunshine_duration ? d.sunshine_duration[0] : null;
+  const sunH = sunSec !== null ? (sunSec / 3600).toFixed(1) : null;
+  if (sunH !== null) {
+    document.getElementById('sunshineHours').innerHTML = `${sunH}<span class="stat-unit">h</span>`;
+    document.getElementById('sunshineSub').innerText = sunH >= 7 ? 'Ottimo per fotosintesi' : sunH >= 4 ? 'Luce sufficiente' : 'Luce scarsa oggi';
+  }
+
+  // Alba / Tramonto
+  const sunrise = d.sunrise ? d.sunrise[0] : null;
+  const sunset  = d.sunset  ? d.sunset[0]  : null;
+  if (sunrise && sunset) {
+    const riseTime = new Date(sunrise);
+    const setTime  = new Date(sunset);
+    const riseStr  = riseTime.getHours().toString().padStart(2,'0') + ':' + riseTime.getMinutes().toString().padStart(2,'0');
+    const setStr   = setTime.getHours().toString().padStart(2,'0')  + ':' + setTime.getMinutes().toString().padStart(2,'0');
+    const daylightMin = Math.round((setTime - riseTime) / 60000);
+    const daylightH   = Math.floor(daylightMin / 60);
+    const daylightM   = daylightMin % 60;
+    document.getElementById('sunriseDisplay').innerHTML = `${riseStr} <span style="color:var(--text2);font-size:14px;">↑</span> ${setStr}`;
+    document.getElementById('daylightSub').innerText = `${daylightH}h ${daylightM}m di luce`;
+  }
+
+  // Pressione atmosferica
+  const pressure = c.surface_pressure ? Math.round(c.surface_pressure) : null;
+  if (pressure) {
+    document.getElementById('pressureDisplay').innerHTML = `${pressure}<span class="stat-unit">hPa</span>`;
+    document.getElementById('pressureSub').innerText = pressure > 1020 ? 'Alta — bel tempo stabile' : pressure > 1010 ? 'Normale' : pressure > 995 ? 'In calo — possibile peggioramento' : 'Bassa — maltempo probabile';
+  }
+
   // HOURLY
   renderHourly(h, hi);
 
@@ -925,7 +970,7 @@ function renderUI(locName, lat, lon, elev, data) {
   renderDaily(d);
 
   // AGRONOMY
-  renderAgronomy(c, h, d, hi, et0, uv, soilT, hum);
+  renderAgronomy(c, h, d, hi, et0, uv, soilT, hum, sunrise, sunset, sunH);
 
   // ALERTS
   renderAlerts(c, h, d, hi, et0, uv, soilT, hum);
@@ -933,7 +978,7 @@ function renderUI(locName, lat, lon, elev, data) {
   loadingEl.style.display = 'none';
   weatherCard.style.display = 'block';
   weatherCard.classList.remove('anim-fade-up');
-  void weatherCard.offsetWidth; // reflow per riavviare l'animazione
+  void weatherCard.offsetWidth;
   weatherCard.classList.add('anim-fade-up');
   setLastUpdated();
 }
@@ -1005,7 +1050,7 @@ function renderDaily(d) {
 // =====================
 // AGRONOMY ENGINE
 // =====================
-function renderAgronomy(c, h, d, hi, et0, uv, soilT, hum) {
+function renderAgronomy(c, h, d, hi, et0, uv, soilT, hum, sunrise, sunset, sunH) {
   const container = document.getElementById('agroGrid');
   container.innerHTML = '';
 
@@ -1307,6 +1352,68 @@ function renderAgronomy(c, h, d, hi, et0, uv, soilT, hum) {
       <div style="${S.barTrack}"><div style="${S.barFill(rad,radCol)}"></div></div>
       <div style="${S.note};margin-top:10px;">UV max: <strong>${uv}</strong> · ${uvDesc}</div>
       <div style="${S.foot}">Copertura nuvolosa: ${cloudNow}%</div>
+    </div>`;
+
+  // ─────────────────────────────────────────────────────────────────────
+  // 9. RISCHIO COLPI DI SOLE FOGLIARI
+  // ─────────────────────────────────────────────────────────────────────
+  // Rischio = UV alto + T aria >28°C + ore centrali (10-16) + foglie bagnate (hum>70)
+  // Ore critiche: quelle con is_day=1, temp>28, nell'arco 10-16
+  const criticalHours = [];
+  for (let i = hi; i < hi + 24 && i < h.time.length; i++) {
+    const hr   = new Date(h.time[i]).getHours();
+    const tmp  = h.temperature_2m[i];
+    const isDay= h.is_day ? h.is_day[i] : 1;
+    if (isDay && hr >= 10 && hr <= 16 && tmp >= 28 && uv >= 6) {
+      criticalHours.push(hr.toString().padStart(2,'0') + ':00');
+    }
+  }
+
+  // Calcola un punteggio rischio 0-100
+  let sunRisk = 0;
+  if (uv >= 11) sunRisk += 40; else if (uv >= 8) sunRisk += 28; else if (uv >= 6) sunRisk += 16;
+  const maxTodayTemp = Math.max(...h.temperature_2m.slice(hi, hi+12));
+  if (maxTodayTemp >= 36) sunRisk += 35; else if (maxTodayTemp >= 32) sunRisk += 22; else if (maxTodayTemp >= 28) sunRisk += 12;
+  if (hum > 70) sunRisk += 15; // foglie bagnate dopo irrigazione/rugiada = lente d'ingrandimento
+  if (criticalHours.length >= 4) sunRisk += 10;
+  sunRisk = Math.min(100, sunRisk);
+
+  const sunRiskCol  = sunRisk >= 60 ? 'var(--red)' : sunRisk >= 35 ? 'var(--yellow)' : 'var(--green)';
+  const sunRiskLbl  = sunRisk >= 60 ? 'Alto' : sunRisk >= 35 ? 'Moderato' : 'Basso';
+
+  let sunRiskAdvice = [];
+  if (sunRisk >= 60) {
+    sunRiskAdvice.push('Evitare di bagnare le foglie nelle ore 10–16: le gocce d\'acqua fungono da lente e bruciano i tessuti.');
+    sunRiskAdvice.push('Considerare ombreggiatura temporanea (rete ombreggiante 30–40%) nelle ore più calde.');
+    if (hum > 70) sunRiskAdvice.push('Umidità elevata: rugiada o irrigazione fogliare mattutina aumentano il rischio. Irrigare alla base.');
+  } else if (sunRisk >= 35) {
+    sunRiskAdvice.push('Irrigare sempre alla base, mai sulle foglie nelle ore soleggiate.');
+    if (uv >= 8) sunRiskAdvice.push('UV elevato: acclimatare le piantine giovani con esposizione graduale.');
+  } else {
+    sunRiskAdvice.push('Condizioni sicure. Nessuna precauzione particolare necessaria oggi.');
+  }
+
+  // Finestra sicura per irrigazione (prima dell'alba o dopo le 17)
+  let safeIrrTime = '';
+  if (sunrise) {
+    const r = new Date(sunrise);
+    const rStr = r.getHours().toString().padStart(2,'0') + ':' + r.getMinutes().toString().padStart(2,'0');
+    safeIrrTime = `Orari sicuri per irrigare le foglie: prima delle ${rStr} o dopo le 17:00.`;
+  }
+
+  container.innerHTML += `
+    <div class="agro-card">
+      <div class="agro-card-title"><div class="agro-icon orange">🍃</div>Rischio Colpi di Sole Fogliari</div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+        <span style="${S.badge(sunRiskCol)}">${sunRiskLbl}</span>
+        <span style="${S.note}">${sunRisk}/100</span>
+      </div>
+      <div style="${S.barTrack}"><div style="${S.barFill(sunRisk, sunRiskCol)}"></div></div>
+      ${criticalHours.length > 0 ? `<div style="${S.note};margin-top:8px;">⚠ Ore critiche oggi: ${criticalHours.join(', ')}</div>` : ''}
+      <div style="display:flex;flex-direction:column;gap:7px;margin-top:10px;">
+        ${sunRiskAdvice.map(t => `<div style="${S.note}">${t}</div>`).join('')}
+      </div>
+      ${safeIrrTime ? `<div style="${S.foot}">${safeIrrTime}</div>` : ''}
     </div>`;
 }
 // =====================
