@@ -424,6 +424,51 @@
     .day-detail { padding: 16px; }
   }
 
+
+  /* GRAFICO TEMPERATURA */
+  .temp-chart-wrap {
+    background: var(--card); border: 1px solid var(--card-border);
+    border-radius: var(--radius-sm); padding: 16px 20px 10px;
+    margin-bottom: 0; position: relative; overflow: hidden;
+  }
+  .temp-chart-svg { width: 100%; display: block; overflow: visible; }
+  .temp-chart-footer {
+    display: flex; justify-content: space-between;
+    padding-top: 6px; overflow: hidden;
+  }
+  .temp-chart-footer span {
+    font-size: 11px; color: var(--text3); flex: 1; text-align: center;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+
+  /* CRONOLOGIA */
+  .history-wrap { position: relative; }
+  .history-btn {
+    background: var(--bg3); border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 10px; color: var(--text2); font-family: var(--font);
+    font-size: 14px; padding: 8px 14px; cursor: pointer;
+    display: flex; align-items: center; gap: 6px; white-space: nowrap;
+    transition: all 0.15s;
+  }
+  .history-btn:hover { background: rgba(255,255,255,0.07); color: var(--text); }
+  .history-dropdown {
+    position: absolute; top: calc(100% + 6px); right: 0; min-width: 220px;
+    background: #1e1e1e; border: 1px solid rgba(255,255,255,0.1);
+    border-radius: var(--radius-sm); overflow: hidden;
+    box-shadow: 0 12px 32px rgba(0,0,0,0.5); z-index: 200; display: none;
+  }
+  .history-dropdown.open { display: block; }
+  .history-item {
+    padding: 11px 16px; cursor: pointer; display: flex; align-items: center;
+    gap: 10px; border-bottom: 1px solid rgba(255,255,255,0.05);
+    transition: background 0.15s; font-size: 14px;
+  }
+  .history-item:last-child { border-bottom: none; }
+  .history-item:hover { background: rgba(255,255,255,0.06); color: var(--text); }
+  .history-item-name { font-weight: 600; color: var(--text); }
+  .history-item-sub { font-size: 11px; color: var(--text3); margin-top: 1px; }
+  .history-empty { padding: 14px 16px; font-size: 13px; color: var(--text3); }
+
   /* RESPONSIVE MOBILE */
   @media (max-width: 640px) {
     /* hero compatto */
@@ -573,6 +618,10 @@
   <div class="btn-row">
     <button class="btn" id="searchBtn">🔍 Cerca</button>
     <button class="btn btn-loc" onclick="useGPS()">📍 Rileva posizione</button>
+    <div class="history-wrap">
+      <button class="btn" id="historyBtn" onclick="toggleHistory()">🕐</button>
+      <div class="history-dropdown" id="historyDropdown"></div>
+    </div>
   </div>
 </div>
 
@@ -764,8 +813,61 @@ async function silentRefresh() {
 function saveLocation(lat, lon, name, elev) {
   try {
     localStorage.setItem('ps_last', JSON.stringify({ lat, lon, name, elev }));
+    // Aggiorna cronologia (max 5 città)
+    let hist = [];
+    try { hist = JSON.parse(localStorage.getItem('ps_history') || '[]'); } catch(e) {}
+    hist = hist.filter(h => h.name !== name);
+    hist.unshift({ lat, lon, name, elev, ts: Date.now() });
+    hist = hist.slice(0, 5);
+    localStorage.setItem('ps_history', JSON.stringify(hist));
+    renderHistory();
   } catch(e) {}
 }
+
+function renderHistory() {
+  const dd = document.getElementById('historyDropdown');
+  if (!dd) return;
+  let hist = [];
+  try { hist = JSON.parse(localStorage.getItem('ps_history') || '[]'); } catch(e) {}
+  if (hist.length === 0) {
+    dd.innerHTML = '<div class="history-empty">Nessuna ricerca recente</div>';
+    return;
+  }
+  dd.innerHTML = hist.map((h, i) => `
+    <div class="history-item" onclick="selectFromHistory(${i})">
+      <div>
+        <div class="history-item-name">${h.name}</div>
+        <div class="history-item-sub">${new Date(h.ts).toLocaleDateString('it', {day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}</div>
+      </div>
+    </div>`).join('');
+}
+
+function selectFromHistory(idx) {
+  let hist = [];
+  try { hist = JSON.parse(localStorage.getItem('ps_history') || '[]'); } catch(e) {}
+  const h = hist[idx];
+  if (!h) return;
+  cityInput.value = h.name;
+  toggleHistory(true);
+  fetchWeather(h.lat, h.lon, h.name, h.elev || 0);
+}
+
+function toggleHistory(forceClose = false) {
+  const dd = document.getElementById('historyDropdown');
+  if (!dd) return;
+  if (forceClose || dd.classList.contains('open')) {
+    dd.classList.remove('open');
+  } else {
+    renderHistory();
+    dd.classList.add('open');
+  }
+}
+
+// Chiudi cronologia cliccando fuori
+document.addEventListener('click', e => {
+  const hw = e.target.closest('.history-wrap');
+  if (!hw) document.getElementById('historyDropdown')?.classList.remove('open');
+});
 
 function loadSavedLocation() {
   try {
@@ -780,7 +882,7 @@ function loadSavedLocation() {
 }
 
 // avvia al caricamento
-window.addEventListener('load', loadSavedLocation);
+window.addEventListener('load', () => { loadSavedLocation(); renderHistory(); });
 
 // =====================
 // WEATHER CODE HELPERS
@@ -1040,6 +1142,100 @@ function renderUI(locName, lat, lon, elev, data) {
   weatherCard.classList.add('anim-fade-up');
   setLastUpdated();
   requestAnimationFrame(() => equalizeHeights());
+}
+
+
+// =====================
+// GRAFICO TEMPERATURA
+// =====================
+function renderTempChart(h, hi) {
+  const container = document.getElementById('tempChartContainer');
+  if (!container) return;
+
+  const W = 900, H = 110, PAD_L = 32, PAD_R = 16, PAD_T = 18, PAD_B = 8;
+  const plotW = W - PAD_L - PAD_R;
+  const plotH = H - PAD_T - PAD_B;
+
+  // Prendi 25 ore
+  const temps = [], rains = [], hours = [], isdays = [];
+  for (let i = hi; i < hi + 25 && i < h.time.length; i++) {
+    temps.push(h.temperature_2m[i]);
+    rains.push(h.precipitation_probability ? h.precipitation_probability[i] : 0);
+    hours.push(new Date(h.time[i]).getHours());
+    isdays.push(h.is_day ? h.is_day[i] : 1);
+  }
+
+  const tMin = Math.min(...temps) - 1.5;
+  const tMax = Math.max(...temps) + 1.5;
+  const tRange = tMax - tMin || 1;
+  const n = temps.length;
+
+  // Mappa x,y
+  const px = i => PAD_L + (i / (n - 1)) * plotW;
+  const py = t => PAD_T + plotH - ((t - tMin) / tRange) * plotH;
+
+  // Linea temperatura
+  const pts = temps.map((t, i) => `${px(i).toFixed(1)},${py(t).toFixed(1)}`).join(' ');
+  const areaBottom = PAD_T + plotH;
+  const areaPath = `M${px(0).toFixed(1)},${areaBottom} ` +
+    temps.map((t, i) => `L${px(i).toFixed(1)},${py(t).toFixed(1)}`).join(' ') +
+    ` L${px(n-1).toFixed(1)},${areaBottom} Z`;
+
+  // Tick ore (ogni 4h)
+  const tickIdxs = [];
+  for (let i = 0; i < n; i++) { if (hours[i] % 4 === 0) tickIdxs.push(i); }
+
+  // Barre pioggia (sfondo leggero)
+  const rainBars = rains.map((r, i) => {
+    if (r < 5) return '';
+    const bw = plotW / (n - 1);
+    const bh = (r / 100) * plotH * 0.4;
+    return `<rect x="${(px(i) - bw/2).toFixed(1)}" y="${(areaBottom - bh).toFixed(1)}" width="${bw.toFixed(1)}" height="${bh.toFixed(1)}" fill="rgba(106,159,181,0.18)" rx="2"/>`;
+  }).join('');
+
+  // Griglia orizzontale leggera (3 livelli)
+  const gridLines = [0.25, 0.5, 0.75].map(f => {
+    const yy = (PAD_T + plotH * (1 - f)).toFixed(1);
+    const tv = (tMin + tRange * f).toFixed(1);
+    return `<line x1="${PAD_L}" y1="${yy}" x2="${W - PAD_R}" y2="${yy}" stroke="rgba(255,255,255,0.05)" stroke-width="1"/>
+            <text x="${(PAD_L - 4).toFixed(1)}" y="${(+yy + 3).toFixed(1)}" text-anchor="end" font-size="9" fill="rgba(255,255,255,0.3)">${tv}°</text>`;
+  }).join('');
+
+  // Punto "ORA" evidenziato
+  const nowDot = `<circle cx="${px(0).toFixed(1)}" cy="${py(temps[0]).toFixed(1)}" r="4" fill="var(--orange)" stroke="var(--bg)" stroke-width="2"/>`;
+
+  // Label temp al di sopra dei picchi ogni 4h
+  const tempLabels = tickIdxs.map(i => {
+    const x = px(i).toFixed(1);
+    const y = (py(temps[i]) - 6).toFixed(1);
+    return `<text x="${x}" y="${y}" text-anchor="middle" font-size="10" fill="rgba(200,122,82,0.85)" font-weight="600">${temps[i]}°</text>`;
+  }).join('');
+
+  // Footer etichette ore
+  const footerLabels = tickIdxs.map(i => {
+    const x = ((px(i) - PAD_L) / plotW * 100).toFixed(1);
+    const lbl = i === 0 ? 'ORA' : hours[i].toString().padStart(2,'0') + ':00';
+    return `<span style="position:absolute;left:${x}%;transform:translateX(-50%);font-size:11px;color:var(--text3);white-space:nowrap;">${lbl}</span>`;
+  }).join('');
+
+  container.innerHTML = `
+    <div class="temp-chart-wrap">
+      <svg class="temp-chart-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+        <defs>
+          <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="var(--orange)" stop-opacity="0.18"/>
+            <stop offset="100%" stop-color="var(--orange)" stop-opacity="0.02"/>
+          </linearGradient>
+        </defs>
+        ${gridLines}
+        ${rainBars}
+        <path d="${areaPath}" fill="url(#areaGrad)"/>
+        <polyline points="${pts}" fill="none" stroke="var(--orange)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+        ${tempLabels}
+        ${nowDot}
+      </svg>
+      <div class="temp-chart-footer" style="position:relative;height:16px;">${footerLabels}</div>
+    </div>`;
 }
 
 // =====================
